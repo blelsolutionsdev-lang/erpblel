@@ -665,15 +665,20 @@ export type Database = {
       }
       ordens_servico: {
         Row: {
+          assinatura_cliente_nome: string | null
+          assinatura_cliente_url: string | null
+          assinatura_em: string | null
           cliente_id: string
           conta_receber_id: string | null
           created_at: string
           data_abertura: string
           data_conclusao: string | null
+          eh_garantia: boolean
           equipamento_id: string | null
           id: string
           laudo_tecnico: string | null
           numero: number
+          os_origem_id: string | null
           problema_relatado: string | null
           status: Database["public"]["Enums"]["os_status"]
           tecnico_id: string | null
@@ -683,15 +688,20 @@ export type Database = {
           valor_total: number | null
         }
         Insert: {
+          assinatura_cliente_nome?: string | null
+          assinatura_cliente_url?: string | null
+          assinatura_em?: string | null
           cliente_id: string
           conta_receber_id?: string | null
           created_at?: string
           data_abertura?: string
           data_conclusao?: string | null
+          eh_garantia?: boolean
           equipamento_id?: string | null
           id?: string
           laudo_tecnico?: string | null
           numero?: never
+          os_origem_id?: string | null
           problema_relatado?: string | null
           status?: Database["public"]["Enums"]["os_status"]
           tecnico_id?: string | null
@@ -701,15 +711,20 @@ export type Database = {
           valor_total?: number | null
         }
         Update: {
+          assinatura_cliente_nome?: string | null
+          assinatura_cliente_url?: string | null
+          assinatura_em?: string | null
           cliente_id?: string
           conta_receber_id?: string | null
           created_at?: string
           data_abertura?: string
           data_conclusao?: string | null
+          eh_garantia?: boolean
           equipamento_id?: string | null
           id?: string
           laudo_tecnico?: string | null
           numero?: never
+          os_origem_id?: string | null
           problema_relatado?: string | null
           status?: Database["public"]["Enums"]["os_status"]
           tecnico_id?: string | null
@@ -738,6 +753,13 @@ export type Database = {
             columns: ["equipamento_id"]
             isOneToOne: false
             referencedRelation: "equipamentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ordens_servico_os_origem_id_fkey"
+            columns: ["os_origem_id"]
+            isOneToOne: false
+            referencedRelation: "ordens_servico"
             referencedColumns: ["id"]
           },
           {
@@ -796,6 +818,51 @@ export type Database = {
             columns: ["produto_id"]
             isOneToOne: false
             referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      os_anexos: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          nome_arquivo: string | null
+          os_id: string
+          storage_path: string
+          tipo: Database["public"]["Enums"]["os_anexo_tipo"]
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          nome_arquivo?: string | null
+          os_id: string
+          storage_path: string
+          tipo: Database["public"]["Enums"]["os_anexo_tipo"]
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          nome_arquivo?: string | null
+          os_id?: string
+          storage_path?: string
+          tipo?: Database["public"]["Enums"]["os_anexo_tipo"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "os_anexos_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "os_anexos_os_id_fkey"
+            columns: ["os_id"]
+            isOneToOne: false
+            referencedRelation: "ordens_servico"
             referencedColumns: ["id"]
           },
         ]
@@ -1057,12 +1124,48 @@ export type Database = {
         }
         Relationships: []
       }
+      user_permissions: {
+        Row: {
+          allow: boolean
+          created_at: string
+          permission_id: string
+          user_id: string
+        }
+        Insert: {
+          allow: boolean
+          created_at?: string
+          permission_id: string
+          user_id: string
+        }
+        Update: {
+          allow?: boolean
+          created_at?: string
+          permission_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_permissions_permission_id_fkey"
+            columns: ["permission_id"]
+            isOneToOne: false
+            referencedRelation: "permissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_permissions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      user_has_permission: { Args: { p_chave: string }; Returns: boolean }
     }
     Enums: {
       ambiente_fiscal: "homologacao" | "producao"
@@ -1076,6 +1179,7 @@ export type Database = {
         | "erro"
         | "rejeitada"
       nota_fiscal_entrada_status: "pendente" | "processada" | "erro"
+      os_anexo_tipo: "foto_conclusao" | "assinatura_cliente" | "outro"
       os_item_tipo: "peca" | "servico"
       os_status:
         | "aberta"
@@ -1193,6 +1297,23 @@ export type Enums<
     ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
     : never
 
+export type CompositeTypes<
+  PublicCompositeTypeNameOrOptions extends
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never) = never,
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never
+
 export const Constants = {
   public: {
     Enums: {
@@ -1202,6 +1323,7 @@ export const Constants = {
       movimento_estoque_tipo: ["entrada", "saida", "ajuste", "transferencia"],
       nfce_status: ["pendente", "autorizada", "cancelada", "erro", "rejeitada"],
       nota_fiscal_entrada_status: ["pendente", "processada", "erro"],
+      os_anexo_tipo: ["foto_conclusao", "assinatura_cliente", "outro"],
       os_item_tipo: ["peca", "servico"],
       os_status: [
         "aberta",

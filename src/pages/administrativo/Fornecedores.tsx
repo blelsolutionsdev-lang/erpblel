@@ -1,0 +1,334 @@
+import { zodResolver } from '@hookform/resolvers/zod'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Pencil, Plus } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { toast } from 'sonner'
+import { z } from 'zod'
+import { PageHeader } from '@/components/PageHeader'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Textarea } from '@/components/ui/textarea'
+import { supabase } from '@/lib/supabase'
+import type { Tables, TablesInsert } from '@/types/database'
+
+type Fornecedor = Tables<'fornecedores'>
+
+const formSchema = z.object({
+  tipo_pessoa: z.enum(['PF', 'PJ']),
+  nome: z.string().min(2, 'Informe o nome ou razão social'),
+  nome_fantasia: z.string().optional(),
+  cpf_cnpj: z.string().optional(),
+  ie: z.string().optional(),
+  email: z.string().email('E-mail inválido').optional().or(z.literal('')),
+  telefone: z.string().optional(),
+  observacoes: z.string().optional(),
+  dados_bancarios: z.object({
+    banco: z.string().optional(),
+    agencia: z.string().optional(),
+    conta: z.string().optional(),
+    pix: z.string().optional(),
+  }),
+})
+
+type FormValues = z.infer<typeof formSchema>
+
+const emptyValues: FormValues = {
+  tipo_pessoa: 'PJ',
+  nome: '',
+  nome_fantasia: '',
+  cpf_cnpj: '',
+  ie: '',
+  email: '',
+  telefone: '',
+  observacoes: '',
+  dados_bancarios: { banco: '', agencia: '', conta: '', pix: '' },
+}
+
+export function Fornecedores() {
+  const queryClient = useQueryClient()
+  const [open, setOpen] = useState(false)
+  const [editing, setEditing] = useState<Fornecedor | null>(null)
+
+  const { data: fornecedores, isLoading } = useQuery({
+    queryKey: ['fornecedores'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('fornecedores').select('*').order('nome')
+      if (error) throw error
+      return data
+    },
+  })
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    setValue,
+    watch,
+    formState: { errors },
+  } = useForm<FormValues>({
+    resolver: zodResolver(formSchema),
+    defaultValues: emptyValues,
+  })
+
+  useEffect(() => {
+    if (editing) {
+      const banco = (editing.dados_bancarios ?? {}) as Record<string, string>
+      reset({
+        tipo_pessoa: editing.tipo_pessoa,
+        nome: editing.nome,
+        nome_fantasia: editing.nome_fantasia ?? '',
+        cpf_cnpj: editing.cpf_cnpj ?? '',
+        ie: editing.ie ?? '',
+        email: editing.email ?? '',
+        telefone: editing.telefone ?? '',
+        observacoes: editing.observacoes ?? '',
+        dados_bancarios: {
+          banco: banco.banco ?? '',
+          agencia: banco.agencia ?? '',
+          conta: banco.conta ?? '',
+          pix: banco.pix ?? '',
+        },
+      })
+    } else {
+      reset(emptyValues)
+    }
+  }, [editing, reset])
+
+  const saveMutation = useMutation({
+    mutationFn: async (values: FormValues) => {
+      const payload: TablesInsert<'fornecedores'> = {
+        tipo_pessoa: values.tipo_pessoa,
+        nome: values.nome,
+        nome_fantasia: values.nome_fantasia || null,
+        cpf_cnpj: values.cpf_cnpj || null,
+        ie: values.ie || null,
+        email: values.email || null,
+        telefone: values.telefone || null,
+        observacoes: values.observacoes || null,
+        dados_bancarios: values.dados_bancarios,
+      }
+
+      if (editing) {
+        const { error } = await supabase.from('fornecedores').update(payload).eq('id', editing.id)
+        if (error) throw error
+      } else {
+        const { error } = await supabase.from('fornecedores').insert(payload)
+        if (error) throw error
+      }
+    },
+    onSuccess: () => {
+      toast.success(editing ? 'Fornecedor atualizado.' : 'Fornecedor cadastrado.')
+      queryClient.invalidateQueries({ queryKey: ['fornecedores'] })
+      setOpen(false)
+      setEditing(null)
+    },
+    onError: (error: Error) => toast.error(error.message),
+  })
+
+  const toggleAtivoMutation = useMutation({
+    mutationFn: async (fornecedor: Fornecedor) => {
+      const { error } = await supabase
+        .from('fornecedores')
+        .update({ ativo: !fornecedor.ativo })
+        .eq('id', fornecedor.id)
+      if (error) throw error
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['fornecedores'] }),
+    onError: (error: Error) => toast.error(error.message),
+  })
+
+  function openNew() {
+    setEditing(null)
+    setOpen(true)
+  }
+
+  function openEdit(fornecedor: Fornecedor) {
+    setEditing(fornecedor)
+    setOpen(true)
+  }
+
+  const tipoPessoa = watch('tipo_pessoa')
+
+  return (
+    <div>
+      <PageHeader
+        title="Fornecedores"
+        description="Cadastro de fornecedores pessoa física e jurídica"
+        actions={
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger render={<Button onClick={openNew} />}>
+              <Plus className="size-4" />
+              Novo fornecedor
+            </DialogTrigger>
+            <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>{editing ? 'Editar fornecedor' : 'Novo fornecedor'}</DialogTitle>
+              </DialogHeader>
+              <form
+                id="fornecedor-form"
+                className="space-y-4"
+                onSubmit={handleSubmit((values) => saveMutation.mutate(values))}
+              >
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Tipo de pessoa</Label>
+                    <Select
+                      items={{ PJ: 'Pessoa jurídica', PF: 'Pessoa física' }}
+                      value={tipoPessoa}
+                      onValueChange={(v) => setValue('tipo_pessoa', (v ?? 'PJ') as 'PF' | 'PJ')}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="PJ">Pessoa jurídica</SelectItem>
+                        <SelectItem value="PF">Pessoa física</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="cpf_cnpj">{tipoPessoa === 'PF' ? 'CPF' : 'CNPJ'}</Label>
+                    <Input id="cpf_cnpj" {...register('cpf_cnpj')} />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="nome">{tipoPessoa === 'PF' ? 'Nome completo' : 'Razão social'}</Label>
+                  <Input id="nome" {...register('nome')} />
+                  {errors.nome && <p className="text-xs text-destructive">{errors.nome.message}</p>}
+                </div>
+
+                {tipoPessoa === 'PJ' && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="nome_fantasia">Nome fantasia</Label>
+                      <Input id="nome_fantasia" {...register('nome_fantasia')} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="ie">Inscrição estadual</Label>
+                      <Input id="ie" {...register('ie')} />
+                    </div>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="email">E-mail</Label>
+                    <Input id="email" type="email" {...register('email')} />
+                    {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="telefone">Telefone</Label>
+                    <Input id="telefone" {...register('telefone')} />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Dados bancários</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input placeholder="Banco" {...register('dados_bancarios.banco')} />
+                    <Input placeholder="Agência" {...register('dados_bancarios.agencia')} />
+                    <Input placeholder="Conta" {...register('dados_bancarios.conta')} />
+                    <Input placeholder="Chave Pix" {...register('dados_bancarios.pix')} />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="observacoes">Observações</Label>
+                  <Textarea id="observacoes" rows={2} {...register('observacoes')} />
+                </div>
+              </form>
+              <DialogFooter>
+                <Button type="submit" form="fornecedor-form" disabled={saveMutation.isPending}>
+                  {saveMutation.isPending ? 'Salvando...' : 'Salvar'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        }
+      />
+
+      <div className="rounded-lg border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Nome</TableHead>
+              <TableHead>CPF/CNPJ</TableHead>
+              <TableHead>Contato</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead className="w-24" />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {isLoading &&
+              Array.from({ length: 4 }).map((_, i) => (
+                <TableRow key={i}>
+                  <TableCell colSpan={5}>
+                    <Skeleton className="h-6 w-full" />
+                  </TableCell>
+                </TableRow>
+              ))}
+
+            {!isLoading && fornecedores?.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={5} className="py-10 text-center text-muted-foreground">
+                  Nenhum fornecedor cadastrado ainda.
+                </TableCell>
+              </TableRow>
+            )}
+
+            {fornecedores?.map((fornecedor) => (
+              <TableRow key={fornecedor.id}>
+                <TableCell>
+                  <div className="font-medium">{fornecedor.nome}</div>
+                  {fornecedor.nome_fantasia && (
+                    <div className="text-xs text-muted-foreground">{fornecedor.nome_fantasia}</div>
+                  )}
+                </TableCell>
+                <TableCell>{fornecedor.cpf_cnpj ?? '—'}</TableCell>
+                <TableCell>
+                  <div className="text-sm">{fornecedor.email ?? '—'}</div>
+                  <div className="text-xs text-muted-foreground">{fornecedor.telefone ?? ''}</div>
+                </TableCell>
+                <TableCell>
+                  <Badge
+                    variant={fornecedor.ativo ? 'default' : 'secondary'}
+                    className="cursor-pointer"
+                    onClick={() => toggleAtivoMutation.mutate(fornecedor)}
+                  >
+                    {fornecedor.ativo ? 'Ativo' : 'Inativo'}
+                  </Badge>
+                </TableCell>
+                <TableCell>
+                  <Button variant="ghost" size="icon" onClick={() => openEdit(fornecedor)}>
+                    <Pencil className="size-4" />
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
+  )
+}

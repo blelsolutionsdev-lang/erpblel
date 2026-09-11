@@ -1,13 +1,14 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ShieldAlert, PlayCircle, Plus } from 'lucide-react'
-import { useState } from 'react'
+import { Pencil, PlayCircle, Plus, ShieldAlert } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 import { z } from 'zod'
 import { PageHeader } from '@/components/PageHeader'
 import { ConcluirOSDialog } from '@/components/os/ConcluirOSDialog'
 import { NovaSubOSDialog } from '@/components/os/NovaSubOSDialog'
+import { OsItensManager } from '@/components/os/OsItensManager'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -62,16 +63,25 @@ const formSchema = z.object({
   cliente_id: z.string().min(1, 'Selecione um cliente'),
   tecnico_id: z.string().optional(),
   problema_relatado: z.string().min(2, 'Descreva o problema relatado'),
-  valor_pecas: z.coerce.number().min(0),
-  valor_servicos: z.coerce.number().min(0),
+  valor_acrescimo: z.coerce.number().min(0),
+  valor_desconto: z.coerce.number().min(0),
 })
 
 type FormValues = z.infer<typeof formSchema>
+
+const emptyValues: FormValues = {
+  cliente_id: '',
+  tecnico_id: '',
+  problema_relatado: '',
+  valor_acrescimo: 0,
+  valor_desconto: 0,
+}
 
 export function OrdensServico() {
   const { user, hasPermission } = useAuth()
   const queryClient = useQueryClient()
   const [open, setOpen] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [osParaConcluir, setOsParaConcluir] = useState<OrdemServico | null>(null)
   const [osParaGarantia, setOsParaGarantia] = useState<OrdemServico | null>(null)
 
@@ -108,6 +118,8 @@ export function OrdensServico() {
     },
   })
 
+  const editing = editingId ? (ordens?.find((o) => o.id === editingId) ?? null) : null
+
   const {
     register,
     handleSubmit,
@@ -117,8 +129,26 @@ export function OrdensServico() {
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: { cliente_id: '', tecnico_id: '', problema_relatado: '', valor_pecas: 0, valor_servicos: 0 },
+    defaultValues: emptyValues,
   })
+
+  useEffect(() => {
+    if (open && editing) {
+      reset({
+        cliente_id: editing.cliente_id,
+        tecnico_id: editing.tecnico_id ?? '',
+        problema_relatado: editing.problema_relatado ?? '',
+        valor_acrescimo: editing.valor_acrescimo,
+        valor_desconto: editing.valor_desconto,
+      })
+    } else if (open && !editingId) {
+      reset(emptyValues)
+    }
+    // Propositalmente não depende de `editing` inteiro: um refetch disparado
+    // pela adição de itens (que atualiza valor_pecas/valor_servicos) não deve
+    // resetar campos que o usuário esteja digitando no formulário.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, editingId])
 
   const saveMutation = useMutation({
     mutationFn: async (values: FormValues) => {
@@ -126,18 +156,27 @@ export function OrdensServico() {
         cliente_id: values.cliente_id,
         tecnico_id: values.tecnico_id || null,
         problema_relatado: values.problema_relatado,
-        valor_pecas: values.valor_pecas,
-        valor_servicos: values.valor_servicos,
+        valor_acrescimo: values.valor_acrescimo,
+        valor_desconto: values.valor_desconto,
       }
-      const { error } = await supabase.from('ordens_servico').insert(payload)
+
+      if (editingId) {
+        const { error } = await supabase.from('ordens_servico').update(payload).eq('id', editingId)
+        if (error) throw error
+        return editingId
+      }
+
+      const { data, error } = await supabase.from('ordens_servico').insert(payload).select('id').single()
       if (error) throw error
+      return data.id as string
     },
-    onSuccess: () => {
-      toast.success('Ordem de serviço aberta.')
+    onSuccess: (id) => {
+      toast.success(editingId ? 'OS atualizada.' : 'OS aberta — agora é só adicionar produtos e serviços.')
       queryClient.invalidateQueries({ queryKey: ['ordens_servico'] })
       queryClient.invalidateQueries({ queryKey: ['dashboard'] })
-      setOpen(false)
-      reset()
+      // Mantém o diálogo aberto, agora em modo edição, para permitir lançar
+      // produtos/kits e serviços na mesma OS que acabou de ser aberta.
+      setEditingId(id)
     },
     onError: (error: Error) => toast.error(error.message),
   })
@@ -162,24 +201,45 @@ export function OrdensServico() {
     statusMutation.mutate({ os, status })
   }
 
+  function abrirNova() {
+    setEditingId(null)
+    setOpen(true)
+  }
+
+  function abrirEdicao(os: OrdemServico) {
+    setEditingId(os.id)
+    setOpen(true)
+  }
+
   const clienteId = watch('cliente_id')
   const tecnicoId = watch('tecnico_id')
+  const acrescimo = Number(watch('valor_acrescimo')) || 0
+  const desconto = Number(watch('valor_desconto')) || 0
+  const totalPreview = (editing?.valor_pecas ?? 0) + (editing?.valor_servicos ?? 0) + acrescimo - desconto
 
   return (
     <div>
       <PageHeader
         title="Ordens de serviço"
-        description="Ao concluir uma OS com valor, a conta a receber correspondente é criada automaticamente"
+        description="Peças/produtos e serviços entram como itens da OS e o total é calculado automaticamente"
         actions={
           podeCriar && (
-            <Dialog open={open} onOpenChange={setOpen}>
-              <DialogTrigger render={<Button />}>
+            <Dialog
+              open={open}
+              onOpenChange={(v) => {
+                setOpen(v)
+                if (!v) setEditingId(null)
+              }}
+            >
+              <DialogTrigger render={<Button onClick={abrirNova} />}>
                 <Plus className="size-4" />
                 Nova OS
               </DialogTrigger>
-              <DialogContent className="max-w-md">
+              <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
                 <DialogHeader>
-                  <DialogTitle>Nova ordem de serviço</DialogTitle>
+                  <DialogTitle>
+                    {editing ? `Editar OS #${editing.numero}` : 'Nova ordem de serviço'}
+                  </DialogTitle>
                 </DialogHeader>
                 <form
                   id="os-form"
@@ -210,7 +270,7 @@ export function OrdensServico() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Técnico</Label>
+                    <Label>Técnico responsável</Label>
                     <Select
                       items={tecnicos?.map((t) => ({ value: t.id, label: t.nome })) ?? []}
                       value={tecnicoId}
@@ -236,25 +296,74 @@ export function OrdensServico() {
                       <p className="text-xs text-destructive">{errors.problema_relatado.message}</p>
                     )}
                   </div>
+                </form>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="valor_pecas">Valor de peças</Label>
-                      <Input id="valor_pecas" type="number" step="0.01" min={0} {...register('valor_pecas')} />
+                {editing ? (
+                  <OsItensManager
+                    osId={editing.id}
+                    editavel={
+                      (podeEditarTudo || editing.tecnico_id === user?.id) &&
+                      editing.status !== 'concluida' &&
+                      editing.status !== 'cancelada'
+                    }
+                  />
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    Salve a OS primeiro para poder adicionar produtos, kits e serviços.
+                  </p>
+                )}
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="valor_acrescimo">Acréscimo</Label>
+                    <Input
+                      id="valor_acrescimo"
+                      type="number"
+                      step="0.01"
+                      min={0}
+                      {...register('valor_acrescimo')}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="valor_desconto">Desconto</Label>
+                    <Input
+                      id="valor_desconto"
+                      type="number"
+                      step="0.01"
+                      min={0}
+                      {...register('valor_desconto')}
+                    />
+                  </div>
+                </div>
+
+                {editing && (
+                  <div className="space-y-1 rounded-lg border p-3 text-sm">
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>Produtos/peças</span>
+                      <span>{formatCurrency(editing.valor_pecas)}</span>
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="valor_servicos">Valor de serviços</Label>
-                      <Input id="valor_servicos" type="number" step="0.01" min={0} {...register('valor_servicos')} />
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>Serviços</span>
+                      <span>{formatCurrency(editing.valor_servicos)}</span>
+                    </div>
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>Acréscimo</span>
+                      <span>+ {formatCurrency(acrescimo)}</span>
+                    </div>
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>Desconto</span>
+                      <span>- {formatCurrency(desconto)}</span>
+                    </div>
+                    <div className="flex justify-between border-t pt-1.5 font-medium">
+                      <span>Total</span>
+                      <span>{formatCurrency(totalPreview)}</span>
                     </div>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Peças e serviços item a item entram numa próxima etapa — por ora o valor total é
-                    informado direto aqui.
-                  </p>
-                </form>
+                )}
+
                 <DialogFooter>
                   <Button type="submit" form="os-form" disabled={saveMutation.isPending}>
-                    {saveMutation.isPending ? 'Salvando...' : 'Abrir OS'}
+                    {saveMutation.isPending ? 'Salvando...' : editing ? 'Salvar' : 'Abrir OS'}
                   </Button>
                 </DialogFooter>
               </DialogContent>
@@ -273,7 +382,7 @@ export function OrdensServico() {
               <TableHead>Abertura</TableHead>
               <TableHead>Valor total</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead className="w-40" />
+              <TableHead className="w-48" />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -340,6 +449,12 @@ export function OrdensServico() {
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-1">
+                      {podeAgir && (
+                        <Button size="xs" variant="outline" onClick={() => abrirEdicao(os)}>
+                          <Pencil className="size-3.5" />
+                          Itens
+                        </Button>
+                      )}
                       {souTecnicoResponsavel && !podeEditarTudo && emAndamentoOuAberta && (
                         <Button
                           size="xs"

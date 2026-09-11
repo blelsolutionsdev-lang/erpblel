@@ -683,6 +683,8 @@ export type Database = {
           status: Database["public"]["Enums"]["os_status"]
           tecnico_id: string | null
           updated_at: string
+          valor_acrescimo: number
+          valor_desconto: number
           valor_pecas: number
           valor_servicos: number
           valor_total: number | null
@@ -706,6 +708,8 @@ export type Database = {
           status?: Database["public"]["Enums"]["os_status"]
           tecnico_id?: string | null
           updated_at?: string
+          valor_acrescimo?: number
+          valor_desconto?: number
           valor_pecas?: number
           valor_servicos?: number
           valor_total?: number | null
@@ -729,6 +733,8 @@ export type Database = {
           status?: Database["public"]["Enums"]["os_status"]
           tecnico_id?: string | null
           updated_at?: string
+          valor_acrescimo?: number
+          valor_desconto?: number
           valor_pecas?: number
           valor_servicos?: number
           valor_total?: number | null
@@ -779,6 +785,7 @@ export type Database = {
           os_id: string
           produto_id: string | null
           quantidade: number
+          servico_id: string | null
           tipo: Database["public"]["Enums"]["os_item_tipo"]
           valor_total: number | null
           valor_unitario: number
@@ -790,6 +797,7 @@ export type Database = {
           os_id: string
           produto_id?: string | null
           quantidade?: number
+          servico_id?: string | null
           tipo: Database["public"]["Enums"]["os_item_tipo"]
           valor_total?: number | null
           valor_unitario?: number
@@ -801,6 +809,7 @@ export type Database = {
           os_id?: string
           produto_id?: string | null
           quantidade?: number
+          servico_id?: string | null
           tipo?: Database["public"]["Enums"]["os_item_tipo"]
           valor_total?: number | null
           valor_unitario?: number
@@ -818,6 +827,13 @@ export type Database = {
             columns: ["produto_id"]
             isOneToOne: false
             referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ordens_servico_itens_servico_id_fkey"
+            columns: ["servico_id"]
+            isOneToOne: false
+            referencedRelation: "servicos"
             referencedColumns: ["id"]
           },
         ]
@@ -1103,6 +1119,36 @@ export type Database = {
           descricao?: string | null
           id?: string
           nome?: string
+        }
+        Relationships: []
+      }
+      servicos: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          descricao: string | null
+          id: string
+          nome: string
+          preco: number
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome: string
+          preco?: number
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome?: string
+          preco?: number
+          updated_at?: string
         }
         Relationships: []
       }

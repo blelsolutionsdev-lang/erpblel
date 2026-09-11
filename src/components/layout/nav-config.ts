@@ -31,7 +31,10 @@ export const navGroups: NavGroup[] = [
   {
     title: 'Ordens de Serviço',
     icon: Wrench,
-    items: [{ title: 'Ordens de serviço', url: '/os' }],
+    items: [
+      { title: 'Ordens de serviço', url: '/os' },
+      { title: 'Serviços', url: '/os/servicos' },
+    ],
   },
   {
     title: 'Financeiro',

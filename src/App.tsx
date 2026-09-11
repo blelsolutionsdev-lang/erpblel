@@ -13,6 +13,7 @@ import { Produtos } from '@/pages/estoque/Produtos'
 import { Movimentacoes } from '@/pages/estoque/Movimentacoes'
 import { Entradas } from '@/pages/estoque/Entradas'
 import { OrdensServico } from '@/pages/os/OrdensServico'
+import { Servicos } from '@/pages/os/Servicos'
 import { ContasReceber } from '@/pages/financeiro/ContasReceber'
 import { ContasPagar } from '@/pages/financeiro/ContasPagar'
 import { Fiscal } from '@/pages/fiscal/Fiscal'
@@ -47,6 +48,7 @@ export default function App() {
               <Route path="/estoque/entradas" element={<Entradas />} />
 
               <Route path="/os" element={<OrdensServico />} />
+              <Route path="/os/servicos" element={<Servicos />} />
 
               <Route path="/financeiro/contas-a-receber" element={<ContasReceber />} />
               <Route path="/financeiro/contas-a-pagar" element={<ContasPagar />} />

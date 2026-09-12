@@ -11,6 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { mensagemErro } from '@/lib/erros'
 import { supabase } from '@/lib/supabase'
 import type { Tables } from '@/types/database'
 
@@ -18,7 +19,13 @@ type KitItem = Tables<'produto_kit_itens'> & {
   componente: Tables<'produtos'>
 }
 
-export function KitComposicao({ kitId }: { kitId: string }) {
+export function KitComposicao({
+  kitId,
+  editavel = true,
+}: {
+  kitId: string
+  editavel?: boolean
+}) {
   const queryClient = useQueryClient()
   const [novoComponenteId, setNovoComponenteId] = useState('')
   const [novaQuantidade, setNovaQuantidade] = useState('1')
@@ -44,6 +51,7 @@ export function KitComposicao({ kitId }: { kitId: string }) {
         .eq('tipo', 'simples')
         .eq('ativo', true)
         .order('nome')
+        .limit(1000)
       if (error) throw error
       return data
     },
@@ -67,7 +75,7 @@ export function KitComposicao({ kitId }: { kitId: string }) {
       setNovoComponenteId('')
       setNovaQuantidade('1')
     },
-    onError: (error: Error) => toast.error(error.message),
+    onError: (error: unknown) => toast.error(mensagemErro(error)),
   })
 
   const updateQuantidadeMutation = useMutation({
@@ -79,7 +87,7 @@ export function KitComposicao({ kitId }: { kitId: string }) {
       if (error) throw error
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['kit_itens', kitId] }),
-    onError: (error: Error) => toast.error(error.message),
+    onError: (error: unknown) => toast.error(mensagemErro(error)),
   })
 
   const removeMutation = useMutation({
@@ -88,7 +96,7 @@ export function KitComposicao({ kitId }: { kitId: string }) {
       if (error) throw error
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['kit_itens', kitId] }),
-    onError: (error: Error) => toast.error(error.message),
+    onError: (error: unknown) => toast.error(mensagemErro(error)),
   })
 
   const componentesJaNoKit = new Set(itens?.map((i) => i.componente_produto_id))
@@ -118,6 +126,7 @@ export function KitComposicao({ kitId }: { kitId: string }) {
                 min={0.001}
                 step="0.001"
                 defaultValue={item.quantidade}
+                disabled={!editavel}
                 className="h-8 w-20"
                 onBlur={(e) => {
                   const quantidade = Number(e.target.value)
@@ -126,19 +135,22 @@ export function KitComposicao({ kitId }: { kitId: string }) {
                   }
                 }}
               />
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                onClick={() => removeMutation.mutate(item.id)}
-              >
-                <Trash2 className="size-3.5" />
-              </Button>
+              {editavel && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={() => removeMutation.mutate(item.id)}
+                >
+                  <Trash2 className="size-3.5" />
+                </Button>
+              )}
             </div>
           ))}
         </div>
       )}
 
+      {editavel && (
       <div className="flex items-center gap-2 border-t pt-3">
         <Select
           items={opcoes.map((p) => ({ value: p.id, label: p.nome }))}
@@ -174,6 +186,7 @@ export function KitComposicao({ kitId }: { kitId: string }) {
           <Plus className="size-3.5" />
         </Button>
       </div>
+      )}
     </div>
   )
 }

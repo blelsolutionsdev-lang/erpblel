@@ -14,6 +14,86 @@ export type Database = {
   }
   public: {
     Tables: {
+      auditoria: {
+        Row: {
+          acao: string
+          alterado_em: string
+          alterado_por: string | null
+          id: number
+          mudancas: Json
+          registro_id: string
+          tabela: string
+        }
+        Insert: {
+          acao: string
+          alterado_em?: string
+          alterado_por?: string | null
+          id?: never
+          mudancas?: Json
+          registro_id: string
+          tabela: string
+        }
+        Update: {
+          acao?: string
+          alterado_em?: string
+          alterado_por?: string | null
+          id?: never
+          mudancas?: Json
+          registro_id?: string
+          tabela?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "auditoria_alterado_por_fkey"
+            columns: ["alterado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fornecedor_produto_codigos: {
+        Row: {
+          codigo: string
+          created_at: string
+          descricao_fornecedor: string | null
+          fornecedor_id: string
+          id: string
+          produto_id: string
+        }
+        Insert: {
+          codigo: string
+          created_at?: string
+          descricao_fornecedor?: string | null
+          fornecedor_id: string
+          id?: string
+          produto_id: string
+        }
+        Update: {
+          codigo?: string
+          created_at?: string
+          descricao_fornecedor?: string | null
+          fornecedor_id?: string
+          id?: string
+          produto_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fornecedor_produto_codigos_fornecedor_id_fkey"
+            columns: ["fornecedor_id"]
+            isOneToOne: false
+            referencedRelation: "fornecedores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fornecedor_produto_codigos_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       caixa_movimentacoes: {
         Row: {
           conta_pagar_id: string | null
@@ -175,6 +255,21 @@ export type Database = {
       }
       configuracoes_fiscais: {
         Row: {
+          cnpj: string | null
+          razao_social: string | null
+          nome_fantasia: string | null
+          inscricao_estadual: string | null
+          regime_tributario: number
+          cfop_padrao: string
+          csosn_padrao: string
+          logradouro: string | null
+          numero: string | null
+          bairro: string | null
+          municipio: string | null
+          codigo_municipio: string | null
+          uf: string | null
+          cep: string | null
+          telefone: string | null
           ambiente: Database["public"]["Enums"]["ambiente_fiscal"]
           ativo: boolean
           created_at: string
@@ -185,6 +280,21 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          cnpj?: string | null
+          razao_social?: string | null
+          nome_fantasia?: string | null
+          inscricao_estadual?: string | null
+          regime_tributario?: number
+          cfop_padrao?: string
+          csosn_padrao?: string
+          logradouro?: string | null
+          numero?: string | null
+          bairro?: string | null
+          municipio?: string | null
+          codigo_municipio?: string | null
+          uf?: string | null
+          cep?: string | null
+          telefone?: string | null
           ambiente?: Database["public"]["Enums"]["ambiente_fiscal"]
           ativo?: boolean
           created_at?: string
@@ -195,6 +305,21 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          cnpj?: string | null
+          razao_social?: string | null
+          nome_fantasia?: string | null
+          inscricao_estadual?: string | null
+          regime_tributario?: number
+          cfop_padrao?: string
+          csosn_padrao?: string
+          logradouro?: string | null
+          numero?: string | null
+          bairro?: string | null
+          municipio?: string | null
+          codigo_municipio?: string | null
+          uf?: string | null
+          cep?: string | null
+          telefone?: string | null
           ambiente?: Database["public"]["Enums"]["ambiente_fiscal"]
           ativo?: boolean
           created_at?: string
@@ -208,6 +333,9 @@ export type Database = {
       }
       contas_pagar: {
         Row: {
+          valor_pago: number
+          juros: number
+          desconto: number
           categoria_id: string | null
           created_at: string
           data_emissao: string
@@ -225,6 +353,9 @@ export type Database = {
           valor: number
         }
         Insert: {
+          valor_pago?: number
+          juros?: number
+          desconto?: number
           categoria_id?: string | null
           created_at?: string
           data_emissao?: string
@@ -242,6 +373,9 @@ export type Database = {
           valor: number
         }
         Update: {
+          valor_pago?: number
+          juros?: number
+          desconto?: number
           categoria_id?: string | null
           created_at?: string
           data_emissao?: string
@@ -277,6 +411,9 @@ export type Database = {
       }
       contas_receber: {
         Row: {
+          valor_pago: number
+          juros: number
+          desconto: number
           categoria_id: string | null
           cliente_id: string | null
           created_at: string
@@ -294,6 +431,9 @@ export type Database = {
           valor: number
         }
         Insert: {
+          valor_pago?: number
+          juros?: number
+          desconto?: number
           categoria_id?: string | null
           cliente_id?: string | null
           created_at?: string
@@ -311,6 +451,9 @@ export type Database = {
           valor: number
         }
         Update: {
+          valor_pago?: number
+          juros?: number
+          desconto?: number
           categoria_id?: string | null
           cliente_id?: string | null
           created_at?: string
@@ -346,6 +489,8 @@ export type Database = {
       }
       equipamentos: {
         Row: {
+          ativo: boolean
+          updated_at: string
           cliente_id: string
           created_at: string
           id: string
@@ -356,6 +501,8 @@ export type Database = {
           tipo: string | null
         }
         Insert: {
+          ativo?: boolean
+          updated_at?: string
           cliente_id: string
           created_at?: string
           id?: string
@@ -366,6 +513,8 @@ export type Database = {
           tipo?: string | null
         }
         Update: {
+          ativo?: boolean
+          updated_at?: string
           cliente_id?: string
           created_at?: string
           id?: string
@@ -599,6 +748,8 @@ export type Database = {
       }
       notas_fiscais_saida: {
         Row: {
+          ambiente: Database["public"]["Enums"]["ambiente_fiscal"]
+          emitida_por: string | null
           autorizada_at: string | null
           chave_acesso: string | null
           cliente_id: string | null
@@ -615,6 +766,8 @@ export type Database = {
           xml_url: string | null
         }
         Insert: {
+          ambiente?: Database["public"]["Enums"]["ambiente_fiscal"]
+          emitida_por?: string | null
           autorizada_at?: string | null
           chave_acesso?: string | null
           cliente_id?: string | null
@@ -631,6 +784,8 @@ export type Database = {
           xml_url?: string | null
         }
         Update: {
+          ambiente?: Database["public"]["Enums"]["ambiente_fiscal"]
+          emitida_por?: string | null
           autorizada_at?: string | null
           chave_acesso?: string | null
           cliente_id?: string | null
@@ -665,6 +820,15 @@ export type Database = {
       }
       ordens_servico: {
         Row: {
+          prioridade: Database["public"]["Enums"]["os_prioridade"]
+          data_prevista: string | null
+          orcamento_enviado_em: string | null
+          aprovado_em: string | null
+          aprovado_por: string | null
+          reprovado_em: string | null
+          motivo_reprovacao: string | null
+          garantia_dias: number
+          garantia_ate: string | null
           assinatura_cliente_nome: string | null
           assinatura_cliente_url: string | null
           assinatura_em: string | null
@@ -690,6 +854,15 @@ export type Database = {
           valor_total: number | null
         }
         Insert: {
+          prioridade?: Database["public"]["Enums"]["os_prioridade"]
+          data_prevista?: string | null
+          orcamento_enviado_em?: string | null
+          aprovado_em?: string | null
+          aprovado_por?: string | null
+          reprovado_em?: string | null
+          motivo_reprovacao?: string | null
+          garantia_dias?: number
+          garantia_ate?: string | null
           assinatura_cliente_nome?: string | null
           assinatura_cliente_url?: string | null
           assinatura_em?: string | null
@@ -715,6 +888,15 @@ export type Database = {
           valor_total?: number | null
         }
         Update: {
+          prioridade?: Database["public"]["Enums"]["os_prioridade"]
+          data_prevista?: string | null
+          orcamento_enviado_em?: string | null
+          aprovado_em?: string | null
+          aprovado_por?: string | null
+          reprovado_em?: string | null
+          motivo_reprovacao?: string | null
+          garantia_dias?: number
+          garantia_ate?: string | null
           assinatura_cliente_nome?: string | null
           assinatura_cliente_url?: string | null
           assinatura_em?: string | null
@@ -1034,6 +1216,7 @@ export type Database = {
         Row: {
           ativo: boolean
           created_at: string
+          deve_trocar_senha: boolean
           email: string
           id: string
           nome: string
@@ -1044,6 +1227,7 @@ export type Database = {
         Insert: {
           ativo?: boolean
           created_at?: string
+          deve_trocar_senha?: boolean
           email: string
           id: string
           nome: string
@@ -1054,6 +1238,7 @@ export type Database = {
         Update: {
           ativo?: boolean
           created_at?: string
+          deve_trocar_senha?: boolean
           email?: string
           id?: string
           nome?: string
@@ -1208,10 +1393,83 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      vw_produtos_estoque: {
+        Row: {
+          ativo: boolean | null
+          estoque_atual: number | null
+          estoque_comprometido: number | null
+          estoque_disponivel: number | null
+          estoque_minimo: number | null
+          id: string | null
+          nome: string | null
+          preco_custo: number | null
+          preco_venda: number | null
+          sku: string | null
+          tipo: Database["public"]["Enums"]["produto_tipo"] | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
+      abrir_sub_os_garantia: { Args: { p_os_id: string; p_problema: string }; Returns: string }
+      aprovar_orcamento_os: {
+        Args: { p_aprovado_por: string; p_os_id: string }
+        Returns: undefined
+      }
+      baixar_titulo: {
+        Args: {
+          p_data?: string
+          p_desconto?: number
+          p_forma_pagamento?: string
+          p_juros?: number
+          p_tipo: string
+          p_titulo_id: string
+          p_valor: number
+        }
+        Returns: Json
+      }
+      enviar_orcamento_os: { Args: { p_os_id: string }; Returns: undefined }
+      marcar_titulos_atrasados: { Args: never; Returns: Json }
+      preparar_nfce_os: { Args: { p_os_id: string }; Returns: Json }
+      registrar_retorno_nfce: {
+        Args: {
+          p_chave?: string
+          p_danfe_url?: string
+          p_erro?: string
+          p_nota_id: string
+          p_status: string
+          p_xml_url?: string
+        }
+        Returns: undefined
+      }
+      relatorio_abc_pecas: { Args: { p_ate: string; p_de: string }; Returns: Json }
+      relatorio_contas_aging: { Args: never; Returns: Json }
+      relatorio_faturamento: { Args: { p_ate: string; p_de: string }; Returns: Json }
+      relatorio_tecnicos: { Args: { p_ate: string; p_de: string }; Returns: Json }
+      reprovar_orcamento_os: { Args: { p_motivo: string; p_os_id: string }; Returns: undefined }
+      sugerir_produtos_nfe: { Args: { p_payload: Json }; Returns: Json }
+      ajustar_estoque: {
+        Args: {
+          p_novo_saldo: number
+          p_observacao?: string
+          p_produto_id: string
+        }
+        Returns: number
+      }
+      concluir_os: {
+        Args: {
+          p_assinatura_nome: string
+          p_assinatura_path: string
+          p_fotos: Json
+          p_laudo: string
+          p_os_id: string
+        }
+        Returns: undefined
+      }
+      registrar_entrada_nfe: { Args: { p_payload: Json }; Returns: Json }
+      resumo_dashboard: { Args: never; Returns: Json }
       user_has_permission: { Args: { p_chave: string }; Returns: boolean }
+      usuario_ativo: { Args: never; Returns: boolean }
     }
     Enums: {
       ambiente_fiscal: "homologacao" | "producao"
@@ -1227,12 +1485,15 @@ export type Database = {
       nota_fiscal_entrada_status: "pendente" | "processada" | "erro"
       os_anexo_tipo: "foto_conclusao" | "assinatura_cliente" | "outro"
       os_item_tipo: "peca" | "servico"
+      os_prioridade: "baixa" | "normal" | "alta" | "urgente"
       os_status:
         | "aberta"
+        | "orcamento"
         | "em_andamento"
         | "aguardando_peca"
         | "concluida"
         | "cancelada"
+        | "reprovada"
       pessoa_tipo: "PF" | "PJ"
       produto_tipo: "simples" | "kit"
       titulo_status: "pendente" | "pago" | "atrasado" | "cancelado"
@@ -1371,12 +1632,15 @@ export const Constants = {
       nota_fiscal_entrada_status: ["pendente", "processada", "erro"],
       os_anexo_tipo: ["foto_conclusao", "assinatura_cliente", "outro"],
       os_item_tipo: ["peca", "servico"],
+      os_prioridade: ["baixa", "normal", "alta", "urgente"],
       os_status: [
         "aberta",
+        "orcamento",
         "em_andamento",
         "aguardando_peca",
         "concluida",
         "cancelada",
+        "reprovada",
       ],
       pessoa_tipo: ["PF", "PJ"],
       produto_tipo: ["simples", "kit"],

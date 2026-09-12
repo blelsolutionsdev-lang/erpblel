@@ -13,9 +13,13 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { SignaturePad, type SignaturePadHandle } from '@/components/os/SignaturePad'
+import { mensagemErro } from '@/lib/erros'
 import { supabase } from '@/lib/supabase'
 
 type OsResumo = { id: string; numero: number }
+
+const MAX_FOTOS = 10
+const MAX_BYTES_POR_FOTO = 10 * 1024 * 1024
 
 export function ConcluirOSDialog({
   os,
@@ -41,6 +45,14 @@ export function ConcluirOSDialog({
     mutationFn: async () => {
       if (!os) throw new Error('OS inválida.')
       if (fotos.length === 0) throw new Error('Anexe pelo menos uma foto da conclusão do serviço.')
+      if (fotos.length > MAX_FOTOS) throw new Error(`No máximo ${MAX_FOTOS} fotos por conclusão.`)
+
+      const grande = fotos.find((f) => f.size > MAX_BYTES_POR_FOTO)
+      if (grande) throw new Error(`A foto "${grande.name}" passa de 10 MB.`)
+
+      const naoImagem = fotos.find((f) => !f.type.startsWith('image/'))
+      if (naoImagem) throw new Error(`"${naoImagem.name}" não é uma imagem.`)
+
       if (!assinaturaNome.trim()) throw new Error('Informe o nome de quem assinou.')
       if (signatureRef.current?.isEmpty()) throw new Error('Colete a assinatura do cliente.')
 
@@ -48,57 +60,63 @@ export function ConcluirOSDialog({
       if (!assinaturaBlob) throw new Error('Não foi possível capturar a assinatura.')
 
       const timestamp = Date.now()
+      // Guarda o que subiu para poder desfazer se o registro no banco falhar —
+      // senão sobra lixo no bucket a cada tentativa frustrada.
+      const enviados: string[] = []
 
-      for (let i = 0; i < fotos.length; i++) {
-        const foto = fotos[i]
-        const ext = foto.name.split('.').pop() || 'jpg'
-        const path = `${os.id}/foto-${timestamp}-${i}.${ext}`
-        const { error: upErr } = await supabase.storage.from('os-anexos').upload(path, foto)
-        if (upErr) throw upErr
-        const { error: insErr } = await supabase.from('os_anexos').insert({
-          os_id: os.id,
-          tipo: 'foto_conclusao',
-          storage_path: path,
-          nome_arquivo: foto.name,
-        })
-        if (insErr) throw insErr
+      async function limparUploads() {
+        if (enviados.length > 0) {
+          await supabase.storage.from('os-anexos').remove(enviados)
+        }
       }
 
-      const assinaturaPath = `${os.id}/assinatura-${timestamp}.png`
-      const { error: sigUpErr } = await supabase.storage
-        .from('os-anexos')
-        .upload(assinaturaPath, assinaturaBlob, { contentType: 'image/png' })
-      if (sigUpErr) throw sigUpErr
+      try {
+        const anexos: { path: string; nome: string }[] = []
 
-      const { error: sigInsErr } = await supabase.from('os_anexos').insert({
-        os_id: os.id,
-        tipo: 'assinatura_cliente',
-        storage_path: assinaturaPath,
-      })
-      if (sigInsErr) throw sigInsErr
+        for (let i = 0; i < fotos.length; i++) {
+          const foto = fotos[i]
+          const ext = foto.name.split('.').pop() || 'jpg'
+          const path = `${os.id}/foto-${timestamp}-${i}.${ext}`
+          const { error: upErr } = await supabase.storage.from('os-anexos').upload(path, foto)
+          if (upErr) throw upErr
+          enviados.push(path)
+          anexos.push({ path, nome: foto.name })
+        }
 
-      const { error: updErr } = await supabase
-        .from('ordens_servico')
-        .update({
-          status: 'concluida',
-          data_conclusao: new Date().toISOString(),
-          laudo_tecnico: laudo || null,
-          assinatura_cliente_nome: assinaturaNome,
-          assinatura_cliente_url: assinaturaPath,
-          assinatura_em: new Date().toISOString(),
+        const assinaturaPath = `${os.id}/assinatura-${timestamp}.png`
+        const { error: sigUpErr } = await supabase.storage
+          .from('os-anexos')
+          .upload(assinaturaPath, assinaturaBlob, { contentType: 'image/png' })
+        if (sigUpErr) throw sigUpErr
+        enviados.push(assinaturaPath)
+
+        // Uma transação só: anexos + conclusão da OS. O banco ainda baixa o
+        // estoque das peças e gera a conta a receber por gatilho — se faltar
+        // peça, nada disso é gravado.
+        const { error: rpcErr } = await supabase.rpc('concluir_os', {
+          p_os_id: os.id,
+          p_laudo: laudo,
+          p_assinatura_nome: assinaturaNome.trim(),
+          p_assinatura_path: assinaturaPath,
+          p_fotos: anexos,
         })
-        .eq('id', os.id)
-      if (updErr) throw updErr
+        if (rpcErr) throw rpcErr
+      } catch (err) {
+        await limparUploads()
+        throw err
+      }
     },
     onSuccess: () => {
-      toast.success('OS concluída — conta a receber gerada automaticamente.')
+      toast.success('OS concluída — estoque baixado e conta a receber gerada.')
       queryClient.invalidateQueries({ queryKey: ['ordens_servico'] })
       queryClient.invalidateQueries({ queryKey: ['contas_receber'] })
+      queryClient.invalidateQueries({ queryKey: ['produtos'] })
+      queryClient.invalidateQueries({ queryKey: ['movimentacoes_estoque'] })
       queryClient.invalidateQueries({ queryKey: ['dashboard'] })
       limpar()
       onOpenChange(false)
     },
-    onError: (error: Error) => toast.error(error.message),
+    onError: (error: unknown) => toast.error(mensagemErro(error)),
   })
 
   return (
@@ -134,9 +152,11 @@ export function ConcluirOSDialog({
               multiple
               onChange={(e) => setFotos(Array.from(e.target.files ?? []))}
             />
-            {fotos.length > 0 && (
-              <p className="text-xs text-muted-foreground">{fotos.length} arquivo(s) selecionado(s)</p>
-            )}
+            <p className="text-xs text-muted-foreground">
+              {fotos.length > 0
+                ? `${fotos.length} arquivo(s) selecionado(s)`
+                : `Até ${MAX_FOTOS} imagens, 10 MB cada.`}
+            </p>
           </div>
 
           <div className="space-y-2">

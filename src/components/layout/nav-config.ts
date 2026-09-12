@@ -1,4 +1,5 @@
 import {
+  BarChart3,
   Boxes,
   FileStack,
   LayoutDashboard,
@@ -6,10 +7,13 @@ import {
   Users,
   Wrench,
 } from 'lucide-react'
+import type { Permissao } from '@/lib/permissoes'
 
 export type NavItem = {
   title: string
   url: string
+  /** Sem a permissão, o item some do menu e a rota é bloqueada. */
+  permissao?: Permissao
 }
 
 export type NavGroup = {
@@ -24,8 +28,13 @@ export const navGroups: NavGroup[] = [
     icon: Boxes,
     items: [
       { title: 'Produtos', url: '/estoque/produtos' },
+      { title: 'Categorias', url: '/estoque/categorias' },
       { title: 'Movimentações', url: '/estoque/movimentacoes' },
-      { title: 'Entrada de NF-e', url: '/estoque/entradas' },
+      {
+        title: 'Entrada de NF-e',
+        url: '/estoque/entradas',
+        permissao: 'estoque.entradas.processar',
+      },
     ],
   },
   {
@@ -40,9 +49,23 @@ export const navGroups: NavGroup[] = [
     title: 'Financeiro',
     icon: ReceiptText,
     items: [
-      { title: 'Contas a receber', url: '/financeiro/contas-a-receber' },
-      { title: 'Contas a pagar', url: '/financeiro/contas-a-pagar' },
+      {
+        title: 'Contas a receber',
+        url: '/financeiro/contas-a-receber',
+        permissao: 'financeiro.gerenciar',
+      },
+      {
+        title: 'Contas a pagar',
+        url: '/financeiro/contas-a-pagar',
+        permissao: 'financeiro.gerenciar',
+      },
+      { title: 'Caixa', url: '/financeiro/caixa', permissao: 'financeiro.gerenciar' },
     ],
+  },
+  {
+    title: 'Relatórios',
+    icon: BarChart3,
+    items: [{ title: 'Gerenciais', url: '/relatorios', permissao: 'relatorios.ver' }],
   },
   {
     title: 'Administrativo',
@@ -50,13 +73,22 @@ export const navGroups: NavGroup[] = [
     items: [
       { title: 'Clientes', url: '/administrativo/clientes' },
       { title: 'Fornecedores', url: '/administrativo/fornecedores' },
-      { title: 'Usuários', url: '/administrativo/usuarios' },
+      {
+        title: 'Usuários',
+        url: '/administrativo/usuarios',
+        permissao: 'administrativo.usuarios.gerenciar',
+      },
+      {
+        title: 'Auditoria',
+        url: '/administrativo/auditoria',
+        permissao: 'administrativo.usuarios.gerenciar',
+      },
     ],
   },
   {
     title: 'Fiscal',
     icon: FileStack,
-    items: [{ title: 'NFC-e', url: '/fiscal' }],
+    items: [{ title: 'NFC-e', url: '/fiscal', permissao: 'fiscal.gerenciar' }],
   },
 ]
 

@@ -31,6 +31,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useAuth } from '@/lib/auth'
+import { mensagemErro, mensagemErroFuncao } from '@/lib/erros'
 import { supabase } from '@/lib/supabase'
 import type { Tables } from '@/types/database'
 
@@ -44,21 +45,6 @@ const formSchema = z.object({
 })
 
 type FormValues = z.infer<typeof formSchema>
-
-async function mensagemErroFuncao(error: unknown): Promise<string> {
-  if (error && typeof error === 'object' && 'context' in error) {
-    const ctx = (error as { context?: Response }).context
-    if (ctx instanceof Response) {
-      try {
-        const body = await ctx.clone().json()
-        if (body?.error) return body.error as string
-      } catch {
-        // corpo não era JSON
-      }
-    }
-  }
-  return error instanceof Error ? error.message : 'Erro inesperado.'
-}
 
 export function Usuarios() {
   const { hasPermission, permissoesCarregadas } = useAuth()
@@ -77,6 +63,7 @@ export function Usuarios() {
         .from('profiles')
         .select('*, role:roles(*)')
         .order('nome')
+        .limit(500)
       if (error) throw error
       return data as Profile[]
     },
@@ -130,7 +117,7 @@ export function Usuarios() {
       setOpen(false)
       setSenhaGerada(data.senha_temporaria)
     },
-    onError: (error: Error) => toast.error(error.message),
+    onError: (error: unknown) => toast.error(mensagemErro(error)),
   })
 
   const updateMutation = useMutation({
@@ -147,7 +134,7 @@ export function Usuarios() {
       queryClient.invalidateQueries({ queryKey: ['usuarios'] })
       setEditing(null)
     },
-    onError: (error: Error) => toast.error(error.message),
+    onError: (error: unknown) => toast.error(mensagemErro(error)),
   })
 
   const toggleAtivoMutation = useMutation({
@@ -156,7 +143,7 @@ export function Usuarios() {
       if (error) throw error
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['usuarios'] }),
-    onError: (error: Error) => toast.error(error.message),
+    onError: (error: unknown) => toast.error(mensagemErro(error)),
   })
 
   const resetPasswordMutation = useMutation({
@@ -169,7 +156,7 @@ export function Usuarios() {
       return data as { senha_temporaria: string }
     },
     onSuccess: (data) => setSenhaGerada(data.senha_temporaria),
-    onError: (error: Error) => toast.error(error.message),
+    onError: (error: unknown) => toast.error(mensagemErro(error)),
   })
 
   const deleteMutation = useMutation({
@@ -186,7 +173,7 @@ export function Usuarios() {
       setEditing(null)
       setConfirmandoExclusao(false)
     },
-    onError: (error: Error) => toast.error(error.message),
+    onError: (error: unknown) => toast.error(mensagemErro(error)),
   })
 
   function openNew() {

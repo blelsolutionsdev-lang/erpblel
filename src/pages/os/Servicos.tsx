@@ -14,13 +14,14 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
+import { useAuth } from '@/lib/auth'
+import { mensagemErro } from '@/lib/erros'
 import { formatCurrency } from '@/lib/format'
 import { supabase } from '@/lib/supabase'
 import type { Tables, TablesInsert } from '@/types/database'
@@ -39,13 +40,15 @@ const emptyValues: FormValues = { nome: '', descricao: '', preco: 0 }
 
 export function Servicos() {
   const queryClient = useQueryClient()
+  const { hasPermission } = useAuth()
+  const podeGerenciar = hasPermission('os.servicos.gerenciar')
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<Servico | null>(null)
 
   const { data: servicos, isLoading } = useQuery({
     queryKey: ['servicos'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('servicos').select('*').order('nome')
+      const { data, error } = await supabase.from('servicos').select('*').order('nome').limit(500)
       if (error) throw error
       return data
     },
@@ -91,7 +94,7 @@ export function Servicos() {
       setOpen(false)
       setEditing(null)
     },
-    onError: (error: Error) => toast.error(error.message),
+    onError: (error: unknown) => toast.error(mensagemErro(error)),
   })
 
   const toggleAtivoMutation = useMutation({
@@ -103,7 +106,7 @@ export function Servicos() {
       if (error) throw error
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['servicos'] }),
-    onError: (error: Error) => toast.error(error.message),
+    onError: (error: unknown) => toast.error(mensagemErro(error)),
   })
 
   function openNew() {
@@ -122,49 +125,64 @@ export function Servicos() {
         title="Serviços"
         description="Catálogo de serviços com preço padrão, usado para o cálculo automático nas ordens de serviço"
         actions={
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger render={<Button onClick={openNew} />}>
+          podeGerenciar && (
+            <Button onClick={openNew}>
               <Plus className="size-4" />
               Novo serviço
-            </DialogTrigger>
-            <DialogContent className="max-w-md">
-              <DialogHeader>
-                <DialogTitle>{editing ? 'Editar serviço' : 'Novo serviço'}</DialogTitle>
-              </DialogHeader>
-              <form
-                id="servico-form"
-                className="space-y-4"
-                onSubmit={handleSubmit((values) => saveMutation.mutate(values))}
-              >
-                <div className="space-y-2">
-                  <Label htmlFor="nome">Nome</Label>
-                  <Input id="nome" {...register('nome')} />
-                  {errors.nome && <p className="text-xs text-destructive">{errors.nome.message}</p>}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="preco">Preço padrão</Label>
-                  <Input id="preco" type="number" step="0.01" min={0} {...register('preco')} />
-                  <p className="text-xs text-muted-foreground">
-                    Valor sugerido automaticamente ao adicionar este serviço numa OS — pode ser
-                    ajustado por linha se precisar.
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="descricao">Descrição</Label>
-                  <Textarea id="descricao" rows={2} {...register('descricao')} />
-                </div>
-              </form>
-              <DialogFooter>
-                <Button type="submit" form="servico-form" disabled={saveMutation.isPending}>
-                  {saveMutation.isPending ? 'Salvando...' : 'Salvar'}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+            </Button>
+          )
         }
       />
+
+      <Dialog
+        open={open}
+        onOpenChange={(v) => {
+          setOpen(v)
+          if (!v) setEditing(null)
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {editing ? (podeGerenciar ? 'Editar serviço' : editing.nome) : 'Novo serviço'}
+            </DialogTitle>
+          </DialogHeader>
+          <form
+            id="servico-form"
+            className="space-y-4"
+            onSubmit={handleSubmit((values) => saveMutation.mutate(values))}
+          >
+            <fieldset disabled={!podeGerenciar} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="nome">Nome</Label>
+                <Input id="nome" {...register('nome')} />
+                {errors.nome && <p className="text-xs text-destructive">{errors.nome.message}</p>}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="preco">Preço padrão</Label>
+                <Input id="preco" type="number" step="0.01" min={0} {...register('preco')} />
+                <p className="text-xs text-muted-foreground">
+                  Valor sugerido automaticamente ao adicionar este serviço numa OS — pode ser
+                  ajustado por linha se precisar.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="descricao">Descrição</Label>
+                <Textarea id="descricao" rows={2} {...register('descricao')} />
+              </div>
+            </fieldset>
+          </form>
+          {podeGerenciar && (
+            <DialogFooter>
+              <Button type="submit" form="servico-form" disabled={saveMutation.isPending}>
+                {saveMutation.isPending ? 'Salvando...' : 'Salvar'}
+              </Button>
+            </DialogFooter>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <div className="rounded-lg border">
         <Table>
@@ -206,8 +224,8 @@ export function Servicos() {
                 <TableCell>
                   <Badge
                     variant={servico.ativo ? 'default' : 'secondary'}
-                    className="cursor-pointer"
-                    onClick={() => toggleAtivoMutation.mutate(servico)}
+                    className={podeGerenciar ? 'cursor-pointer' : ''}
+                    onClick={() => podeGerenciar && toggleAtivoMutation.mutate(servico)}
                   >
                     {servico.ativo ? 'Ativo' : 'Inativo'}
                   </Badge>

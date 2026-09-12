@@ -1,11 +1,13 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Plus } from 'lucide-react'
+import { Plus, Search } from 'lucide-react'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 import { z } from 'zod'
 import { PageHeader } from '@/components/PageHeader'
+import { Paginacao, usePaginacao } from '@/components/Paginacao'
+import { BaixarTituloDialog, type TituloParaBaixa } from '@/components/financeiro/BaixarTituloDialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -28,6 +30,8 @@ import {
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { formatCurrency, formatDate } from '@/lib/format'
+import { useDebounce } from '@/hooks/use-debounce'
+import { mensagemErro } from '@/lib/erros'
 import { supabase } from '@/lib/supabase'
 import type { Tables, TablesInsert } from '@/types/database'
 
@@ -56,18 +60,37 @@ const statusLabel: Record<Tables<'contas_pagar'>['status'], string> = {
 export function ContasPagar() {
   const queryClient = useQueryClient()
   const [open, setOpen] = useState(false)
+  const [busca, setBusca] = useState('')
+  const [baixando, setBaixando] = useState<TituloParaBaixa | null>(null)
 
-  const { data: contas, isLoading } = useQuery({
-    queryKey: ['contas_pagar'],
+  const buscaDebounced = useDebounce(busca)
+  const { pagina, setPagina, de, ate } = usePaginacao(buscaDebounced)
+
+  const {
+    data: resultado,
+    isLoading,
+    isFetching,
+  } = useQuery({
+    queryKey: ['contas_pagar', buscaDebounced, pagina],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('contas_pagar')
-        .select('*, fornecedor:fornecedores(*), categoria:categorias_financeiras(*)')
+        .select('*, fornecedor:fornecedores(*), categoria:categorias_financeiras(*)', { count: 'exact' })
         .order('data_vencimento')
+        .range(de, ate)
+
+      const termo = buscaDebounced.trim()
+      if (termo) {
+        query = query.ilike('descricao', `%${termo}%`)
+      }
+
+      const { data, error, count } = await query
       if (error) throw error
-      return data as ContaPagar[]
+      return { linhas: data as ContaPagar[], total: count }
     },
   })
+
+  const contas = resultado?.linhas
 
   const { data: fornecedores } = useQuery({
     queryKey: ['fornecedores-select'],
@@ -127,23 +150,7 @@ export function ContasPagar() {
       setOpen(false)
       reset()
     },
-    onError: (error: Error) => toast.error(error.message),
-  })
-
-  const pagarMutation = useMutation({
-    mutationFn: async (conta: ContaPagar) => {
-      const { error } = await supabase
-        .from('contas_pagar')
-        .update({ status: 'pago', data_pagamento: new Date().toISOString().slice(0, 10) })
-        .eq('id', conta.id)
-      if (error) throw error
-    },
-    onSuccess: () => {
-      toast.success('Pagamento registrado.')
-      queryClient.invalidateQueries({ queryKey: ['contas_pagar'] })
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
-    },
-    onError: (error: Error) => toast.error(error.message),
+    onError: (error: unknown) => toast.error(mensagemErro(error)),
   })
 
   const fornecedorId = watch('fornecedor_id')
@@ -245,6 +252,18 @@ export function ContasPagar() {
         }
       />
 
+      <div className="mb-3 flex items-center gap-2">
+        <div className="relative w-full max-w-sm">
+          <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            placeholder="Buscar pela descrição do título..."
+            className="pl-8"
+          />
+        </div>
+      </div>
+
       <div className="rounded-lg border">
         <Table>
           <TableHeader>
@@ -253,6 +272,7 @@ export function ContasPagar() {
               <TableHead>Descrição</TableHead>
               <TableHead>Vencimento</TableHead>
               <TableHead>Valor</TableHead>
+              <TableHead>Em aberto</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="w-40" />
             </TableRow>
@@ -261,7 +281,7 @@ export function ContasPagar() {
             {isLoading &&
               Array.from({ length: 4 }).map((_, i) => (
                 <TableRow key={i}>
-                  <TableCell colSpan={6}>
+                  <TableCell colSpan={7}>
                     <Skeleton className="h-6 w-full" />
                   </TableCell>
                 </TableRow>
@@ -269,8 +289,8 @@ export function ContasPagar() {
 
             {!isLoading && contas?.length === 0 && (
               <TableRow>
-                <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
-                  Nenhuma conta a pagar cadastrada ainda.
+                <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
+                  {buscaDebounced ? 'Nenhum título encontrado para essa busca.' : 'Nenhuma conta a pagar cadastrada ainda.'}
                 </TableCell>
               </TableRow>
             )}
@@ -282,7 +302,26 @@ export function ContasPagar() {
                 <TableCell>{formatDate(conta.data_vencimento)}</TableCell>
                 <TableCell>{formatCurrency(conta.valor)}</TableCell>
                 <TableCell>
-                  <Badge variant={conta.status === 'pago' ? 'default' : 'secondary'}>
+                  {conta.valor_pago > 0 && conta.status !== 'pago' ? (
+                    <span className="text-amber-600">
+                      {formatCurrency(conta.valor - conta.valor_pago)}
+                    </span>
+                  ) : conta.status === 'pago' ? (
+                    <span className="text-muted-foreground">—</span>
+                  ) : (
+                    formatCurrency(conta.valor - conta.valor_pago)
+                  )}
+                </TableCell>
+                <TableCell>
+                  <Badge
+                    variant={
+                      conta.status === 'pago'
+                        ? 'default'
+                        : conta.status === 'atrasado'
+                          ? 'destructive'
+                          : 'secondary'
+                    }
+                  >
                     {statusLabel[conta.status]}
                   </Badge>
                 </TableCell>
@@ -291,10 +330,16 @@ export function ContasPagar() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => pagarMutation.mutate(conta)}
-                      disabled={pagarMutation.isPending}
+                      onClick={() =>
+                        setBaixando({
+                          id: conta.id,
+                          descricao: conta.descricao,
+                          valor: conta.valor,
+                          valor_pago: conta.valor_pago,
+                        })
+                      }
                     >
-                      Marcar como pago
+                      Baixar
                     </Button>
                   )}
                 </TableCell>
@@ -303,6 +348,19 @@ export function ContasPagar() {
           </TableBody>
         </Table>
       </div>
+
+      <Paginacao
+        pagina={pagina}
+        setPagina={setPagina}
+        total={resultado?.total}
+        carregando={isFetching}
+      />
+
+      <BaixarTituloDialog
+        tipo="pagar"
+        titulo={baixando}
+        onOpenChange={(v) => !v && setBaixando(null)}
+      />
     </div>
   )
 }

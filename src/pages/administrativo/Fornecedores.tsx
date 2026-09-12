@@ -1,11 +1,12 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Pencil, Plus } from 'lucide-react'
+import { Pencil, Plus, Search } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 import { z } from 'zod'
 import { PageHeader } from '@/components/PageHeader'
+import { Paginacao, usePaginacao } from '@/components/Paginacao'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -28,6 +29,9 @@ import {
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
+import { useDebounce } from '@/hooks/use-debounce'
+import { useAuth } from '@/lib/auth'
+import { mensagemErro } from '@/lib/erros'
 import { supabase } from '@/lib/supabase'
 import type { Tables, TablesInsert } from '@/types/database'
 
@@ -66,17 +70,40 @@ const emptyValues: FormValues = {
 
 export function Fornecedores() {
   const queryClient = useQueryClient()
+  const { hasPermission } = useAuth()
+  const podeGerenciar = hasPermission('administrativo.fornecedores.gerenciar')
+  const [busca, setBusca] = useState('')
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<Fornecedor | null>(null)
 
-  const { data: fornecedores, isLoading } = useQuery({
-    queryKey: ['fornecedores'],
+  const buscaDebounced = useDebounce(busca)
+  const { pagina, setPagina, de, ate } = usePaginacao(buscaDebounced)
+
+  const {
+    data: resultado,
+    isLoading,
+    isFetching,
+  } = useQuery({
+    queryKey: ['fornecedores', buscaDebounced, pagina],
     queryFn: async () => {
-      const { data, error } = await supabase.from('fornecedores').select('*').order('nome')
+      let query = supabase
+        .from('fornecedores')
+        .select('*', { count: 'exact' })
+        .order('nome')
+        .range(de, ate)
+
+      const termo = buscaDebounced.trim()
+      if (termo) {
+        query = query.or(`nome.ilike.%${termo}%,cpf_cnpj.ilike.%${termo}%,email.ilike.%${termo}%`)
+      }
+
+      const { data, error, count } = await query
       if (error) throw error
-      return data
+      return { linhas: data as Fornecedor[], total: count }
     },
   })
+
+  const fornecedores = resultado?.linhas
 
   const {
     register,
@@ -142,7 +169,7 @@ export function Fornecedores() {
       setOpen(false)
       setEditing(null)
     },
-    onError: (error: Error) => toast.error(error.message),
+    onError: (error: unknown) => toast.error(mensagemErro(error)),
   })
 
   const toggleAtivoMutation = useMutation({
@@ -154,7 +181,7 @@ export function Fornecedores() {
       if (error) throw error
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['fornecedores'] }),
-    onError: (error: Error) => toast.error(error.message),
+    onError: (error: unknown) => toast.error(mensagemErro(error)),
   })
 
   function openNew() {
@@ -176,10 +203,12 @@ export function Fornecedores() {
         description="Cadastro de fornecedores pessoa física e jurídica"
         actions={
           <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger render={<Button onClick={openNew} />}>
-              <Plus className="size-4" />
-              Novo fornecedor
-            </DialogTrigger>
+            {podeGerenciar && (
+              <DialogTrigger render={<Button onClick={openNew} />}>
+                <Plus className="size-4" />
+                Novo fornecedor
+              </DialogTrigger>
+            )}
             <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>{editing ? 'Editar fornecedor' : 'Novo fornecedor'}</DialogTitle>
@@ -189,6 +218,7 @@ export function Fornecedores() {
                 className="space-y-4"
                 onSubmit={handleSubmit((values) => saveMutation.mutate(values))}
               >
+                <fieldset disabled={!podeGerenciar} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Tipo de pessoa</Label>
@@ -257,16 +287,31 @@ export function Fornecedores() {
                   <Label htmlFor="observacoes">Observações</Label>
                   <Textarea id="observacoes" rows={2} {...register('observacoes')} />
                 </div>
+                </fieldset>
               </form>
+              {podeGerenciar && (
               <DialogFooter>
-                <Button type="submit" form="fornecedor-form" disabled={saveMutation.isPending}>
+<Button type="submit" form="fornecedor-form" disabled={saveMutation.isPending}>
                   {saveMutation.isPending ? 'Salvando...' : 'Salvar'}
                 </Button>
               </DialogFooter>
+              )}
             </DialogContent>
           </Dialog>
         }
       />
+
+      <div className="mb-3 flex items-center gap-2">
+        <div className="relative w-full max-w-sm">
+          <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            placeholder="Buscar por nome, CPF/CNPJ ou e-mail..."
+            className="pl-8"
+          />
+        </div>
+      </div>
 
       <div className="rounded-lg border">
         <Table>
@@ -292,7 +337,7 @@ export function Fornecedores() {
             {!isLoading && fornecedores?.length === 0 && (
               <TableRow>
                 <TableCell colSpan={5} className="py-10 text-center text-muted-foreground">
-                  Nenhum fornecedor cadastrado ainda.
+                  {buscaDebounced ? 'Nenhum resultado para essa busca.' : 'Nenhum fornecedor cadastrado ainda.'}
                 </TableCell>
               </TableRow>
             )}
@@ -313,8 +358,8 @@ export function Fornecedores() {
                 <TableCell>
                   <Badge
                     variant={fornecedor.ativo ? 'default' : 'secondary'}
-                    className="cursor-pointer"
-                    onClick={() => toggleAtivoMutation.mutate(fornecedor)}
+                    className={podeGerenciar ? 'cursor-pointer' : ''}
+                    onClick={() => podeGerenciar && toggleAtivoMutation.mutate(fornecedor)}
                   >
                     {fornecedor.ativo ? 'Ativo' : 'Inativo'}
                   </Badge>
@@ -329,6 +374,13 @@ export function Fornecedores() {
           </TableBody>
         </Table>
       </div>
+
+      <Paginacao
+        pagina={pagina}
+        setPagina={setPagina}
+        total={resultado?.total}
+        carregando={isFetching}
+      />
     </div>
   )
 }

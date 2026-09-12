@@ -4,21 +4,23 @@
 // Anthropic (Claude, com leitura nativa de PDF) para extrair os dados
 // estruturados: fornecedor, cabeçalho da nota e itens.
 //
+// Exige sessão válida e a permissão 'estoque.entradas.processar' — sem isso
+// qualquer um com a chave publishable (que vai no bundle do front) poderia
+// gastar a cota da API da Anthropic.
+//
 // Requer o secret ANTHROPIC_API_KEY configurado no projeto Supabase
 // (Dashboard → Edge Functions → Secrets, ou `supabase secrets set`).
-// Sem esse secret, a função responde 500 com uma mensagem explicando o que
-// falta — não expõe nem pede a chave por nenhum outro caminho.
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
+import { corsHeaders, exigirPermissao, json } from '../_shared/http.ts'
 
 const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY')
 const ANTHROPIC_VERSION = '2023-06-01'
 const MODEL = 'claude-sonnet-5'
 
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+// 10 MB de PDF viram ~13,4 MB em base64; acima disso a chamada estoura o limite
+// de payload da própria Edge Function, então recusamos com mensagem clara.
+const MAX_PDF_BASE64_BYTES = 14_000_000
 
 const EXTRACT_TOOL = {
   name: 'registrar_dados_nfe',
@@ -57,31 +59,35 @@ const EXTRACT_TOOL = {
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: CORS_HEADERS })
+    return new Response('ok', { headers: corsHeaders(req) })
   }
 
   if (req.method !== 'POST') {
-    return new Response('Method not allowed', { status: 405, headers: CORS_HEADERS })
+    return json(req, { error: 'Method not allowed' }, 405)
   }
 
+  const auth = await exigirPermissao(req, 'estoque.entradas.processar')
+  if (auth instanceof Response) return auth
+
   if (!ANTHROPIC_API_KEY) {
-    return new Response(
-      JSON.stringify({
+    return json(
+      req,
+      {
         error:
           'Secret ANTHROPIC_API_KEY não configurada neste projeto Supabase. ' +
           'Configure em Project Settings → Edge Functions → Secrets.',
-      }),
-      { status: 500, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } },
+      },
+      500,
     )
   }
 
   try {
     const { pdf_base64 } = await req.json()
     if (!pdf_base64 || typeof pdf_base64 !== 'string') {
-      return new Response(JSON.stringify({ error: 'Campo pdf_base64 é obrigatório.' }), {
-        status: 400,
-        headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
-      })
+      return json(req, { error: 'Campo pdf_base64 é obrigatório.' }, 400)
+    }
+    if (pdf_base64.length > MAX_PDF_BASE64_BYTES) {
+      return json(req, { error: 'PDF grande demais (máximo ~10 MB).' }, 413)
     }
 
     const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
@@ -120,28 +126,17 @@ Deno.serve(async (req: Request) => {
 
     if (!anthropicRes.ok) {
       const errText = await anthropicRes.text()
-      return new Response(
-        JSON.stringify({ error: `Erro na API da Anthropic (${anthropicRes.status}): ${errText}` }),
-        { status: 502, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } },
-      )
+      return json(req, { error: `Erro na API da Anthropic (${anthropicRes.status}): ${errText}` }, 502)
     }
 
     const data = await anthropicRes.json()
     const toolUse = data.content?.find((b: { type: string }) => b.type === 'tool_use')
     if (!toolUse) {
-      return new Response(JSON.stringify({ error: 'Não foi possível extrair os dados do PDF.' }), {
-        status: 502,
-        headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
-      })
+      return json(req, { error: 'Não foi possível extrair os dados do PDF.' }, 502)
     }
 
-    return new Response(JSON.stringify(toolUse.input), {
-      headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
-    })
+    return json(req, toolUse.input)
   } catch (err) {
-    return new Response(JSON.stringify({ error: String(err) }), {
-      status: 500,
-      headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
-    })
+    return json(req, { error: String(err) }, 500)
   }
 })

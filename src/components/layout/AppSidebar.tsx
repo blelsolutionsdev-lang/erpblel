@@ -16,7 +16,16 @@ import { useAuth } from '@/lib/auth'
 import { dashboardItem, navGroups } from './nav-config'
 
 export function AppSidebar() {
-  const { profile, signOut } = useAuth()
+  const { profile, signOut, hasPermission } = useAuth()
+
+  // Grupo sem nenhum item permitido não aparece — antes o menu mostrava todos
+  // os módulos para todo mundo, inclusive Usuários e Fiscal.
+  const gruposVisiveis = navGroups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => !item.permissao || hasPermission(item.permissao)),
+    }))
+    .filter((group) => group.items.length > 0)
 
   return (
     <Sidebar collapsible="icon">
@@ -53,7 +62,7 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {navGroups.map((group) => (
+        {gruposVisiveis.map((group) => (
           <SidebarGroup key={group.title}>
             <SidebarGroupLabel className="flex items-center gap-2">
               <group.icon className="size-3.5" />

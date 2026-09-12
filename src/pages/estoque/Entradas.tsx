@@ -16,33 +16,38 @@ import {
 } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { mensagemErro, mensagemErroFuncao } from '@/lib/erros'
 import { formatCurrency } from '@/lib/format'
 import { type NFeItem, type NFeParsed, parseNFeXml } from '@/lib/nfe-xml'
 import { supabase } from '@/lib/supabase'
 
+type ProdutoResumo = { id: string; nome: string; ncm: string | null; codigo_barras: string | null }
+
 type ItemMatch = {
   item: NFeItem
   produtoId: string // '' significa "criar novo produto"
+  origemMatch: string | null
+}
+
+type SugestaoItem = {
+  numero_item: string | number
+  produto_id: string | null
+  origem: string | null
+}
+
+const origemMatchLabel: Record<string, string> = {
+  codigo_fornecedor: 'código do fornecedor',
+  gtin: 'código de barras',
+  descricao: 'descrição idêntica',
 }
 
 type OrigemEntrada = 'compra_xml' | 'compra_pdf' | 'compra_chave'
 
 const CRIAR_NOVO = '__novo__'
 
-async function mensagemErroFuncao(error: unknown): Promise<string> {
-  if (error && typeof error === 'object' && 'context' in error) {
-    const ctx = (error as { context?: Response }).context
-    if (ctx instanceof Response) {
-      try {
-        const body = await ctx.clone().json()
-        if (body?.error) return body.error as string
-      } catch {
-        // corpo não era JSON — ignora e cai no fallback abaixo
-      }
-    }
-  }
-  return error instanceof Error ? error.message : 'Erro inesperado.'
-}
+// 10 MB de PDF; acima disso o base64 estoura o limite de payload da Edge
+// Function e o erro que volta não explica nada.
+const MAX_PDF_BYTES = 10 * 1024 * 1024
 
 function toBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -74,6 +79,8 @@ export function Entradas() {
   const [chaveError, setChaveError] = useState<string | null>(null)
   const [chaveLoading, setChaveLoading] = useState(false)
 
+  // Uma única leitura da lista de produtos, compartilhada entre o casamento
+  // automático e os selects da tela de revisão.
   const { data: produtos } = useQuery({
     queryKey: ['produtos-select-nfe'],
     queryFn: async () => {
@@ -81,18 +88,9 @@ export function Entradas() {
         .from('produtos')
         .select('id, nome, ncm, codigo_barras')
         .order('nome')
+        .limit(2000)
       if (error) throw error
-      return data
-    },
-    enabled: !!parsed,
-  })
-
-  const { data: unidades } = useQuery({
-    queryKey: ['unidades_medida'],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('unidades_medida').select('*').order('sigla')
-      if (error) throw error
-      return data
+      return data as ProdutoResumo[]
     },
     enabled: !!parsed,
   })
@@ -101,15 +99,39 @@ export function Entradas() {
     setOrigem(origemMetodo)
     setParsed(result)
 
-    const { data: existentes } = await supabase.from('produtos').select('id, nome, ncm, codigo_barras')
+    // O casamento é feito no banco: primeiro pelo de-para do fornecedor
+    // (código do produto no catálogo dele), depois por GTIN e, por último,
+    // descrição idêntica. O casamento por NCM que existia aqui era perigoso —
+    // NCM é classificação fiscal compartilhada por dezenas de produtos.
+    const { data: sugestao } = await supabase.rpc('sugerir_produtos_nfe', {
+      p_payload: {
+        fornecedor_cnpj: result.fornecedor_cnpj,
+        itens: result.itens.map((i) => ({
+          numero_item: i.numero_item,
+          codigo_produto_fornecedor: i.codigo_produto_fornecedor,
+          ean: i.ean,
+          descricao: i.descricao,
+        })),
+      },
+    })
+
+    const porItem = new Map<number, { produto_id: string | null; origem: string | null }>()
+    const itensSugeridos = (sugestao as { itens?: SugestaoItem[] } | null)?.itens ?? []
+    for (const linha of itensSugeridos) {
+      porItem.set(Number(linha.numero_item), {
+        produto_id: linha.produto_id,
+        origem: linha.origem,
+      })
+    }
 
     setMatches(
       result.itens.map((item) => {
-        const porCodigoBarras = item.ean ? existentes?.find((p) => p.codigo_barras === item.ean) : undefined
-        const candidatosPorNcm = item.ncm ? existentes?.filter((p) => p.ncm === item.ncm) : []
-        const porNcmUnico = candidatosPorNcm?.length === 1 ? candidatosPorNcm[0] : undefined
-        const encontrado = porCodigoBarras ?? porNcmUnico
-        return { item, produtoId: encontrado?.id ?? '' }
+        const sugerido = porItem.get(item.numero_item)
+        return {
+          item,
+          produtoId: sugerido?.produto_id ?? '',
+          origemMatch: sugerido?.origem ?? null,
+        }
       }),
     )
 
@@ -147,8 +169,14 @@ export function Entradas() {
     const file = e.target.files?.[0]
     if (!file) return
     setPdfError(null)
-    setPdfLoading(true)
 
+    if (file.size > MAX_PDF_BYTES) {
+      setPdfError('PDF grande demais (máximo 10 MB).')
+      if (pdfInputRef.current) pdfInputRef.current.value = ''
+      return
+    }
+
+    setPdfLoading(true)
     try {
       const pdf_base64 = await toBase64(file)
       const { data, error } = await supabase.functions.invoke('parse-danfe', { body: { pdf_base64 } })
@@ -188,131 +216,65 @@ export function Entradas() {
     }
   }
 
-  function unidadeIdPara(siglaXml: string | null) {
-    if (!siglaXml) return null
-    const match = unidades?.find((u) => u.sigla.toLowerCase() === siglaXml.toLowerCase())
-    return match?.id ?? unidades?.find((u) => u.sigla === 'UN')?.id ?? null
-  }
-
   const confirmarMutation = useMutation({
     mutationFn: async () => {
       if (!parsed) throw new Error('Nenhuma NF-e carregada.')
+      if (!dataVencimento) throw new Error('Informe o vencimento da conta a pagar.')
 
-      // 1) fornecedor: busca por CNPJ, cria se não existir
-      let fornecedorId: string | null = null
-      if (parsed.fornecedor_cnpj) {
-        const { data: existente } = await supabase
-          .from('fornecedores')
-          .select('id')
-          .eq('cpf_cnpj', parsed.fornecedor_cnpj)
-          .maybeSingle()
-
-        if (existente) {
-          fornecedorId = existente.id
-        } else {
-          const { data: criado, error } = await supabase
-            .from('fornecedores')
-            .insert({
-              nome: parsed.fornecedor_nome ?? 'Fornecedor sem nome',
-              cpf_cnpj: parsed.fornecedor_cnpj,
-              tipo_pessoa: 'PJ',
-            })
-            .select('id')
-            .single()
-          if (error) throw error
-          fornecedorId = criado.id
-        }
-      }
-
-      // 2) nota fiscal de entrada
-      const { data: nota, error: notaError } = await supabase
-        .from('notas_fiscais_entrada')
-        .insert({
+      // Tudo numa transação só no banco (fornecedor, nota, produtos, itens,
+      // movimentações e conta a pagar). Antes eram ~5 requisições por item:
+      // qualquer falha no meio deixava a nota "processada" com o estoque pela
+      // metade e sem conta a pagar, sem como desfazer.
+      const { data, error } = await supabase.rpc('registrar_entrada_nfe', {
+        p_payload: {
           chave_acesso: parsed.chave_acesso,
           numero: parsed.numero,
           serie: parsed.serie,
-          fornecedor_id: fornecedorId,
           data_emissao: parsed.data_emissao,
+          fornecedor_cnpj: parsed.fornecedor_cnpj,
+          fornecedor_nome: parsed.fornecedor_nome,
           valor_total: parsed.valor_total,
           xml_original: xmlOriginal || null,
-          status: 'processada',
-          processed_at: new Date().toISOString(),
-        })
-        .select('id')
-        .single()
-      if (notaError) throw notaError
-
-      // 3) itens + produtos + movimentações de estoque
-      for (const m of matches) {
-        let produtoId = m.produtoId
-
-        if (!produtoId) {
-          const { data: novoProduto, error: produtoError } = await supabase
-            .from('produtos')
-            .insert({
-              nome: m.item.descricao,
-              ncm: m.item.ncm,
-              cest: m.item.cest,
-              codigo_barras: m.item.ean,
-              unidade_id: unidadeIdPara(m.item.unidade),
-              preco_custo: m.item.valor_unitario,
-              preco_venda: m.item.valor_unitario,
-            })
-            .select('id')
-            .single()
-          if (produtoError) throw produtoError
-          produtoId = novoProduto.id
-        } else {
-          await supabase.from('produtos').update({ preco_custo: m.item.valor_unitario }).eq('id', produtoId)
-        }
-
-        const { error: itemError } = await supabase.from('notas_fiscais_entrada_itens').insert({
-          nota_id: nota.id,
-          produto_id: produtoId,
-          codigo_produto_fornecedor: m.item.codigo_produto_fornecedor,
-          descricao: m.item.descricao,
-          ncm: m.item.ncm,
-          cest: m.item.cest,
-          quantidade: m.item.quantidade,
-          valor_unitario: m.item.valor_unitario,
-          valor_total: m.item.valor_total,
-        })
-        if (itemError) throw itemError
-
-        const { error: movError } = await supabase.from('movimentacoes_estoque').insert({
-          produto_id: produtoId,
-          tipo: 'entrada',
-          quantidade: m.item.quantidade,
-          preco_unitario: m.item.valor_unitario,
           origem_tipo: origem,
-          origem_id: nota.id,
-          observacao: `NF-e ${parsed.numero ?? ''} série ${parsed.serie ?? ''}`,
-        })
-        if (movError) throw movError
-      }
-
-      // 4) conta a pagar do fornecedor
-      if (fornecedorId && parsed.valor_total) {
-        const { error: contaError } = await supabase.from('contas_pagar').insert({
-          fornecedor_id: fornecedorId,
-          descricao: `NF-e ${parsed.numero ?? ''} série ${parsed.serie ?? ''}`,
-          valor: parsed.valor_total,
           data_vencimento: dataVencimento,
-          origem_tipo: origem,
-          origem_id: nota.id,
-        })
-        if (contaError) throw contaError
+          itens: matches.map((m) => ({
+            produto_id: m.produtoId || null,
+            codigo_produto_fornecedor: m.item.codigo_produto_fornecedor,
+            descricao: m.item.descricao,
+            ncm: m.item.ncm,
+            cest: m.item.cest,
+            ean: m.item.ean,
+            unidade: m.item.unidade,
+            quantidade: m.item.quantidade,
+            valor_unitario: m.item.valor_unitario,
+            valor_total: m.item.valor_total,
+          })),
+        },
+      })
+      if (error) throw error
+      return data as unknown as {
+        produtos_criados: number
+        itens: number
+        vinculos_aprendidos: number
       }
     },
-    onSuccess: () => {
-      toast.success('Entrada de estoque registrada com sucesso.')
+    onSuccess: (resumo) => {
+      toast.success(
+        `Entrada registrada: ${resumo.itens} item(ns)` +
+          (resumo.produtos_criados > 0 ? `, ${resumo.produtos_criados} produto(s) novo(s)` : '') +
+          (resumo.vinculos_aprendidos > 0
+            ? `. ${resumo.vinculos_aprendidos} código(s) do fornecedor memorizado(s) para a próxima nota.`
+            : '.'),
+      )
       queryClient.invalidateQueries({ queryKey: ['produtos'] })
+      queryClient.invalidateQueries({ queryKey: ['produtos-select-nfe'] })
       queryClient.invalidateQueries({ queryKey: ['fornecedores'] })
       queryClient.invalidateQueries({ queryKey: ['contas_pagar'] })
+      queryClient.invalidateQueries({ queryKey: ['movimentacoes_estoque'] })
       queryClient.invalidateQueries({ queryKey: ['dashboard'] })
       limpar()
     },
-    onError: (error: Error) => toast.error(error.message),
+    onError: (error: unknown) => toast.error(mensagemErro(error)),
   })
 
   return (
@@ -472,6 +434,11 @@ export function Entradas() {
                     </TableCell>
                     <TableCell>{formatCurrency(m.item.valor_unitario)}</TableCell>
                     <TableCell className="min-w-56">
+                      {m.produtoId && m.origemMatch && (
+                        <p className="mb-1 text-[11px] text-muted-foreground">
+                          casado por {origemMatchLabel[m.origemMatch] ?? m.origemMatch}
+                        </p>
+                      )}
                       <Select
                         items={[
                           { value: CRIAR_NOVO, label: '+ Criar novo produto' },
@@ -481,7 +448,9 @@ export function Entradas() {
                         onValueChange={(v) =>
                           setMatches((prev) =>
                             prev.map((pm, i) =>
-                              i === index ? { ...pm, produtoId: v === CRIAR_NOVO ? '' : (v ?? '') } : pm,
+                              i === index
+                                ? { ...pm, produtoId: v === CRIAR_NOVO ? '' : (v ?? ''), origemMatch: null }
+                                : pm,
                             ),
                           )
                         }

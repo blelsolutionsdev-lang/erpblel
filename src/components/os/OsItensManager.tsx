@@ -12,6 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { mensagemErro } from '@/lib/erros'
 import { formatCurrency } from '@/lib/format'
 import { supabase } from '@/lib/supabase'
 import type { Tables } from '@/types/database'
@@ -50,6 +51,7 @@ export function OsItensManager({ osId, editavel }: { osId: string; editavel: boo
         .select('id, nome, tipo, preco_venda')
         .eq('ativo', true)
         .order('nome')
+        .limit(1000)
       if (error) throw error
       return data
     },
@@ -63,6 +65,7 @@ export function OsItensManager({ osId, editavel }: { osId: string; editavel: boo
         .select('id, nome, preco')
         .eq('ativo', true)
         .order('nome')
+        .limit(1000)
       if (error) throw error
       return data
     },
@@ -71,6 +74,9 @@ export function OsItensManager({ osId, editavel }: { osId: string; editavel: boo
   function invalidar() {
     queryClient.invalidateQueries({ queryKey: ['os_itens', osId] })
     queryClient.invalidateQueries({ queryKey: ['ordens_servico'] })
+    // A OS em edição é carregada por uma query própria: sem invalidar aqui, o
+    // resumo de valores do diálogo ficava parado no valor anterior.
+    queryClient.invalidateQueries({ queryKey: ['ordem_servico', osId] })
   }
 
   const addProdutoMutation = useMutation({
@@ -97,7 +103,7 @@ export function OsItensManager({ osId, editavel }: { osId: string; editavel: boo
       setProdutoQtd('1')
       setProdutoValor('')
     },
-    onError: (error: Error) => toast.error(error.message),
+    onError: (error: unknown) => toast.error(mensagemErro(error)),
   })
 
   const addServicoMutation = useMutation({
@@ -124,7 +130,7 @@ export function OsItensManager({ osId, editavel }: { osId: string; editavel: boo
       setServicoQtd('1')
       setServicoValor('')
     },
-    onError: (error: Error) => toast.error(error.message),
+    onError: (error: unknown) => toast.error(mensagemErro(error)),
   })
 
   const updateItemMutation = useMutation({
@@ -133,7 +139,7 @@ export function OsItensManager({ osId, editavel }: { osId: string; editavel: boo
       if (error) throw error
     },
     onSuccess: invalidar,
-    onError: (error: Error) => toast.error(error.message),
+    onError: (error: unknown) => toast.error(mensagemErro(error)),
   })
 
   const removeItemMutation = useMutation({
@@ -142,7 +148,7 @@ export function OsItensManager({ osId, editavel }: { osId: string; editavel: boo
       if (error) throw error
     },
     onSuccess: invalidar,
-    onError: (error: Error) => toast.error(error.message),
+    onError: (error: unknown) => toast.error(mensagemErro(error)),
   })
 
   const pecas = itens?.filter((i) => i.tipo === 'peca') ?? []

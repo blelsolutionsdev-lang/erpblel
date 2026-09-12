@@ -29,6 +29,7 @@ export const navGroups: NavGroup[] = [
     items: [
       { title: 'Produtos', url: '/estoque/produtos' },
       { title: 'Categorias', url: '/estoque/categorias' },
+      { title: 'Estoque mínimo', url: '/estoque/minimos' },
       { title: 'Movimentações', url: '/estoque/movimentacoes' },
       {
         title: 'Entrada de NF-e',

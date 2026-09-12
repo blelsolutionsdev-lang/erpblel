@@ -31,6 +31,9 @@ const ContasReceber = lazy(() =>
 const ContasPagar = lazy(() => import('@/pages/financeiro/ContasPagar').then((m) => ({ default: m.ContasPagar })))
 const Fiscal = lazy(() => import('@/pages/fiscal/Fiscal').then((m) => ({ default: m.Fiscal })))
 const Categorias = lazy(() => import('@/pages/estoque/Categorias').then((m) => ({ default: m.Categorias })))
+const EstoqueMinimo = lazy(() =>
+  import('@/pages/estoque/EstoqueMinimo').then((m) => ({ default: m.EstoqueMinimo })),
+)
 const Caixa = lazy(() => import('@/pages/financeiro/Caixa').then((m) => ({ default: m.Caixa })))
 const Relatorios = lazy(() => import('@/pages/relatorios/Relatorios').then((m) => ({ default: m.Relatorios })))
 const Auditoria = lazy(() => import('@/pages/administrativo/Auditoria').then((m) => ({ default: m.Auditoria })))
@@ -83,6 +86,7 @@ export default function App() {
 
                     <Route path="/estoque/produtos" element={<Produtos />} />
                     <Route path="/estoque/categorias" element={<Categorias />} />
+                  <Route path="/estoque/minimos" element={<EstoqueMinimo />} />
                     <Route path="/estoque/movimentacoes" element={<Movimentacoes />} />
                     <Route
                       path="/estoque/entradas"

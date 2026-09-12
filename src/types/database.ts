@@ -1456,7 +1456,9 @@ export type Database = {
         }
         Returns: number
       }
+      consumo_produtos: { Args: { p_dias?: number }; Returns: Json }
       contagem_produtos_por_categoria: { Args: never; Returns: Json }
+      definir_estoque_minimo: { Args: { p_itens: Json }; Returns: number }
       totais_caixa: { Args: { p_ate: string; p_de: string }; Returns: Json }
       concluir_os: {
         Args: {

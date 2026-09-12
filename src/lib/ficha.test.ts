@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { consumoComPerda, custoFicha, custoLinhaFicha } from '@/lib/ficha'
+import { consumoComPerda, custoFicha, custoLinhaFicha, faltanteDe, necessidadeDe } from '@/lib/ficha'
 
 describe('ficha técnica — consumo com perda', () => {
   it('sem perda, consome a quantidade da ficha', () => {
@@ -44,5 +44,37 @@ describe('ficha técnica — custo', () => {
 
   it('ficha vazia custa zero', () => {
     expect(custoFicha([])).toBe(0)
+  })
+})
+
+describe('explosão de kit', () => {
+  it('reproduz o exemplo do cadastro', () => {
+    // Produzir 10 do Kit Aquecedor X: 2 curvas, 1 registro e 4 conexões por kit.
+    expect(necessidadeDe(10, 2)).toBe(20)
+    expect(necessidadeDe(10, 1)).toBe(10)
+    expect(necessidadeDe(10, 4)).toBe(40)
+
+    // Disponível: 16 curvas, 15 registros, 32 conexões.
+    expect(faltanteDe(20, 16)).toBe(4)
+    expect(faltanteDe(10, 15)).toBe(0)
+    expect(faltanteDe(40, 32)).toBe(8)
+  })
+
+  it('a perda prevista entra na necessidade', () => {
+    // 3 m de tubo com 5% por kit, 4 kits: 3 × 1,05 × 4 = 12,6.
+    expect(necessidadeDe(4, 3, 5)).toBeCloseTo(12.6, 4)
+  })
+
+  it('sobra não vira faltante negativo', () => {
+    expect(faltanteDe(3, 10)).toBe(0)
+  })
+
+  it('sem nada disponível, falta tudo', () => {
+    expect(faltanteDe(7, 0)).toBe(7)
+  })
+
+  it('disponível negativo (mais reservado que saldo) não reduz a falta', () => {
+    // A view pode devolver disponível negativo quando a reserva passa do saldo.
+    expect(faltanteDe(5, -2)).toBe(7)
   })
 })

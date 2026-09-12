@@ -6,6 +6,7 @@ export const PERMISSOES = [
   'administrativo.clientes.gerenciar',
   'administrativo.fornecedores.gerenciar',
   'administrativo.usuarios.gerenciar',
+  'compras.solicitar',
   'estoque.entradas.processar',
   'estoque.produtos.gerenciar',
   'financeiro.gerenciar',

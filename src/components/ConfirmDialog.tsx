@@ -13,6 +13,12 @@ export type PedidoConfirmacao = {
   titulo: string
   descricao: ReactNode
   rotuloConfirmar?: string
+  /**
+   * Rótulo do botão que fecha sem fazer nada. Só vale a pena mudar quando a
+   * ação em si é um cancelamento — "Cancelar" ao lado de "Cancelar solicitação"
+   * deixa o diálogo ambíguo.
+   */
+  rotuloDispensar?: string
   destrutivo?: boolean
   aoConfirmar: () => void | Promise<void>
 }
@@ -51,7 +57,7 @@ export function useConfirmacao() {
         <div className="text-sm text-muted-foreground">{pedido?.descricao}</div>
         <DialogFooter>
           <Button variant="outline" onClick={() => setPedido(null)} disabled={executando}>
-            Cancelar
+            {pedido?.rotuloDispensar ?? 'Cancelar'}
           </Button>
           <Button
             variant={pedido?.destrutivo ? 'destructive' : 'default'}

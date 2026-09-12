@@ -26,3 +26,24 @@ export function custoFicha(linhas: LinhaFicha[]) {
   // linha acumularia centavos de diferença em fichas longas.
   return Math.round(linhas.reduce((soma, l) => soma + custoLinhaFicha(l), 0) * 100) / 100
 }
+
+/**
+ * Necessidade de um componente para produzir `quantidadeProduzida` do pai.
+ * Espelha a recursão de `explodir_kit()`: quantidade da ficha × perda × produção.
+ */
+export function necessidadeDe(
+  quantidadeProduzida: number,
+  quantidadeNaFicha: number,
+  perdaPercentual = 0,
+) {
+  return consumoComPerda(quantidadeNaFicha, perdaPercentual) * quantidadeProduzida
+}
+
+/**
+ * O que falta comprar. Usa o DISPONÍVEL (saldo menos o que outras OS abertas já
+ * reservaram), não o saldo físico — comprar contra o saldo físico é o jeito de
+ * furar duas vezes a mesma peça.
+ */
+export function faltanteDe(necessario: number, disponivel: number) {
+  return Math.max(necessario - disponivel, 0)
+}

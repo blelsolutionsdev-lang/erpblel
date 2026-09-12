@@ -1512,6 +1512,99 @@ export type Database = {
         }
         Relationships: []
       }
+      solicitacoes_compra: {
+        Row: {
+          created_at: string
+          id: string
+          numero: number
+          observacao: string | null
+          origem_descricao: string | null
+          origem_id: string | null
+          origem_tipo: string | null
+          solicitada_por: string | null
+          status: Database["public"]["Enums"]["solicitacao_compra_status"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          numero?: never
+          observacao?: string | null
+          origem_descricao?: string | null
+          origem_id?: string | null
+          origem_tipo?: string | null
+          solicitada_por?: string | null
+          status?: Database["public"]["Enums"]["solicitacao_compra_status"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          numero?: never
+          observacao?: string | null
+          origem_descricao?: string | null
+          origem_id?: string | null
+          origem_tipo?: string | null
+          solicitada_por?: string | null
+          status?: Database["public"]["Enums"]["solicitacao_compra_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "solicitacoes_compra_solicitada_por_fkey"
+            columns: ["solicitada_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      solicitacoes_compra_itens: {
+        Row: {
+          id: string
+          observacao: string | null
+          produto_id: string
+          quantidade: number
+          solicitacao_id: string
+        }
+        Insert: {
+          id?: string
+          observacao?: string | null
+          produto_id: string
+          quantidade: number
+          solicitacao_id: string
+        }
+        Update: {
+          id?: string
+          observacao?: string | null
+          produto_id?: string
+          quantidade?: number
+          solicitacao_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "solicitacoes_compra_itens_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "solicitacoes_compra_itens_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_produtos_estoque"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "solicitacoes_compra_itens_solicitacao_id_fkey"
+            columns: ["solicitacao_id"]
+            isOneToOne: false
+            referencedRelation: "solicitacoes_compra"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       unidades_medida: {
         Row: {
           descricao: string
@@ -1615,6 +1708,10 @@ export type Database = {
         }
         Returns: Json
       }
+      cancelar_solicitacao_compra: {
+        Args: { p_motivo?: string; p_solicitacao_id: string }
+        Returns: undefined
+      }
       concluir_os: {
         Args: {
           p_assinatura_nome: string
@@ -1637,6 +1734,18 @@ export type Database = {
       }
       definir_estoque_minimo: { Args: { p_itens: Json }; Returns: number }
       enviar_orcamento_os: { Args: { p_os_id: string }; Returns: undefined }
+      explodir_kit: {
+        Args: { p_produto_id: string; p_quantidade?: number }
+        Returns: Json
+      }
+      gerar_solicitacao_de_faltantes: {
+        Args: {
+          p_observacao?: string
+          p_produto_id: string
+          p_quantidade: number
+        }
+        Returns: Json
+      }
       marcar_titulos_atrasados: { Args: never; Returns: Json }
       preparar_nfce_os: { Args: { p_os_id: string }; Returns: Json }
       registrar_entrada_nfe: { Args: { p_payload: Json }; Returns: Json }
@@ -1700,6 +1809,12 @@ export type Database = {
         | "reprovada"
       pessoa_tipo: "PF" | "PJ"
       produto_tipo: "simples" | "kit"
+      solicitacao_compra_status:
+        | "aberta"
+        | "aprovada"
+        | "reprovada"
+        | "atendida"
+        | "cancelada"
       titulo_status: "pendente" | "pago" | "atrasado" | "cancelado"
     }
     CompositeTypes: {
@@ -1849,6 +1964,13 @@ export const Constants = {
       ],
       pessoa_tipo: ["PF", "PJ"],
       produto_tipo: ["simples", "kit"],
+      solicitacao_compra_status: [
+        "aberta",
+        "aprovada",
+        "reprovada",
+        "atendida",
+        "cancelada",
+      ],
       titulo_status: ["pendente", "pago", "atrasado", "cancelado"],
     },
   },

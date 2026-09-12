@@ -74,6 +74,10 @@ Schema versionado em `supabase/migrations/`:
 | `20260912182013_ficha_tecnica_migrar_produto_kit_itens.sql` | migra a composição antiga para a versão 1 (nada é apagado) |
 | `20260912182038_ficha_tecnica_rpcs_versao_e_ativacao.sql` | `criar_versao_ficha` e `ativar_ficha_tecnica` |
 | `20260912182050_cascata_estoque_usa_ficha_vigente.sql` | a baixa em cascata passa a ler a ficha em vigor |
+| `20260912190000_comprometido_explode_kit.sql` | a reserva das OS abertas desce pela ficha até os componentes |
+| `20260912190100_rpc_explodir_kit.sql` | `explodir_kit`: necessário × disponível × faltante |
+| `20260912190200_solicitacao_compra.sql` | `solicitacoes_compra` e a permissão `compras.solicitar` |
+| `20260912190300_rpcs_solicitacao_de_faltantes.sql` | `gerar_solicitacao_de_faltantes` e `cancelar_solicitacao_compra` |
 
 Para aplicar num projeto novo: `supabase db push`. No projeto que já estava no
 ar, essas versões foram registradas como aplicadas no histórico do Supabase, e
@@ -94,7 +98,7 @@ nas Edge Functions e no front (`useAuth().hasPermission`). Usuário com
 
 Chaves: `administrativo.clientes.gerenciar`,
 `administrativo.fornecedores.gerenciar`, `administrativo.usuarios.gerenciar`,
-`estoque.entradas.processar`, `estoque.produtos.gerenciar`,
+`compras.solicitar`, `estoque.entradas.processar`, `estoque.produtos.gerenciar`,
 `financeiro.gerenciar`, `fiscal.gerenciar`, `os.criar`, `os.editar`,
 `os.excluir`, `os.servicos.gerenciar`, `relatorios.ver`.
 
@@ -135,6 +139,21 @@ Chaves: `administrativo.clientes.gerenciar`,
 - `produto_kit_itens` está **obsoleta** — mantida só como registro do que havia
   antes de existir versionamento.
 
+#### Explosão de kit e reserva
+
+- `explodir_kit(produto, quantidade)` desce pela ficha em vigor (multinível, com
+  perda) e agrega nos componentes reais: submontado é etapa de montagem, não
+  linha de compra. Recusa explodir se algum submontado estiver sem ficha em
+  vigor, porque a necessidade sairia subestimada.
+- `vw_produtos_estoque.estoque_comprometido` **explode o kit**: uma OS aberta com
+  kit reserva os componentes, não só o kit (que não tem saldo próprio).
+- O faltante é calculado sobre o **disponível**, não sobre o saldo físico —
+  comprar contra o saldo físico é o jeito de prometer a mesma peça duas vezes.
+- `gerar_solicitacao_de_faltantes` **recalcula a explosão no servidor**: entre a
+  tela mostrar o resultado e a pessoa clicar, uma OS pode ter reservado o saldo.
+- A mesma aritmética está em `src/lib/ficha.ts` (`necessidadeDe`, `faltanteDe`),
+  com testes que travam o exemplo do cadastro junto com a versão SQL.
+
 ### Rotinas agendadas (pg_cron)
 
 | Job | Quando | O que faz |
@@ -145,7 +164,8 @@ Chaves: `administrativo.clientes.gerenciar`,
 
 | Função | O que faz | Exige |
 | --- | --- | --- |
-| `admin-users` | criar/resetar senha/excluir usuário no Auth | `administrativo.usuarios.gerenciar` |
+| `admin-users` | criar/resetar senha/excluir usuário no Auth | `compras.solicitar` | abrir e cancelar solicitações de compra (admin, gerente, estoque) |
+| `administrativo.usuarios.gerenciar` |
 | `parse-danfe` | lê um PDF de DANFE com a API da Anthropic | `estoque.entradas.processar` |
 | `focus-nfe-consulta` | consulta NF-e recebida na Focus NFE | `estoque.entradas.processar` |
 | `focus-nfe-emitir` | emite/consulta a NFC-e da OS na Focus NFE | `fiscal.gerenciar` |

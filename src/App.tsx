@@ -31,6 +31,12 @@ const ContasReceber = lazy(() =>
 const ContasPagar = lazy(() => import('@/pages/financeiro/ContasPagar').then((m) => ({ default: m.ContasPagar })))
 const Fiscal = lazy(() => import('@/pages/fiscal/Fiscal').then((m) => ({ default: m.Fiscal })))
 const Categorias = lazy(() => import('@/pages/estoque/Categorias').then((m) => ({ default: m.Categorias })))
+const ExplosaoKit = lazy(() =>
+  import('@/pages/estoque/ExplosaoKit').then((m) => ({ default: m.ExplosaoKit })),
+)
+const SolicitacoesCompra = lazy(() =>
+  import('@/pages/compras/SolicitacoesCompra').then((m) => ({ default: m.SolicitacoesCompra })),
+)
 const EstoqueMinimo = lazy(() =>
   import('@/pages/estoque/EstoqueMinimo').then((m) => ({ default: m.EstoqueMinimo })),
 )
@@ -86,13 +92,23 @@ export default function App() {
 
                     <Route path="/estoque/produtos" element={<Produtos />} />
                     <Route path="/estoque/categorias" element={<Categorias />} />
-                  <Route path="/estoque/minimos" element={<EstoqueMinimo />} />
+                    <Route path="/estoque/minimos" element={<EstoqueMinimo />} />
+                    <Route path="/estoque/explosao" element={<ExplosaoKit />} />
                     <Route path="/estoque/movimentacoes" element={<Movimentacoes />} />
                     <Route
                       path="/estoque/entradas"
                       element={
                         <ProtectedRoute permissao="estoque.entradas.processar">
                           <Entradas />
+                        </ProtectedRoute>
+                      }
+                    />
+
+                    <Route
+                      path="/compras/solicitacoes"
+                      element={
+                        <ProtectedRoute permissao="compras.solicitar">
+                          <SolicitacoesCompra />
                         </ProtectedRoute>
                       }
                     />

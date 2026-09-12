@@ -51,7 +51,14 @@ function DialogContent({
       <DialogPrimitive.Popup
         data-slot="dialog-content"
         className={cn(
-          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+          // `max-w-sm` sem prefixo de breakpoint é proposital: como `sm:max-w-sm`
+          // e o `max-w-lg`/`max-w-2xl` que as telas passam são variantes
+          // diferentes, o tailwind-merge não conseguia resolver o conflito e a
+          // regra dentro do media query ganhava — todo diálogo ficava travado em
+          // 384px acima de 640px de viewport, com o conteúdo estourando em
+          // rolagem horizontal. A largura fica no `w-[calc(100%-2rem)]`, que
+          // segura o diálogo dentro da tela em qualquer tamanho.
+          "fixed top-1/2 left-1/2 z-50 grid w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 -translate-y-1/2 gap-4 overflow-x-hidden rounded-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
           className
         )}
         {...props}
@@ -102,7 +109,9 @@ function DialogFooter({
       className={cn(
         // Fica grudado no rodapé: em diálogos longos (produto, cliente, OS) o
         // botão de salvar ficava abaixo da dobra, sobretudo no celular.
-        "sticky bottom-0 z-10 -mx-4 -mb-4 flex flex-col-reverse gap-2 rounded-b-xl border-t bg-muted/50 p-4 sm:flex-row sm:justify-end",
+        // O fundo é opaco de propósito — com `bg-muted/50` o conteúdo passava
+        // por baixo dos botões enquanto a pessoa rolava.
+        "sticky bottom-0 z-10 -mx-4 -mb-4 flex flex-col-reverse gap-2 rounded-b-xl border-t bg-popover p-4 sm:flex-row sm:justify-end",
         className
       )}
       {...props}

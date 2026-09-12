@@ -34,7 +34,7 @@ function LinhaItem({
 
   return (
     <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
-      <span className="w-full flex-1 truncate text-sm sm:w-auto">{item.descricao}</span>
+      <span className="min-w-0 flex-1 truncate text-sm">{item.descricao}</span>
       <Input
         type="number"
         inputMode="decimal"
@@ -67,7 +67,7 @@ function LinhaItem({
           else setValor(String(item.valor_unitario))
         }}
       />
-      <span className="w-24 text-right text-sm font-medium">{formatCurrency(item.valor_total)}</span>
+      <span className="w-24 shrink-0 text-right text-sm font-medium">{formatCurrency(item.valor_total)}</span>
       {editavel && (
         <Button
           type="button"
@@ -258,7 +258,7 @@ export function OsItensManager({ osId, editavel }: { osId: string; editavel: boo
         {editavel && (
           <div className="flex flex-wrap items-center gap-2 border-t pt-3 sm:flex-nowrap">
             <Combobox
-              className="w-full sm:flex-1"
+              className="min-w-0 flex-1"
               queryKey="produtos"
               valor={produtoId}
               buscar={buscarProdutos}
@@ -332,7 +332,7 @@ export function OsItensManager({ osId, editavel }: { osId: string; editavel: boo
         {editavel && (
           <div className="flex flex-wrap items-center gap-2 border-t pt-3 sm:flex-nowrap">
             <Combobox
-              className="w-full sm:flex-1"
+              className="min-w-0 flex-1"
               queryKey="servicos"
               valor={servicoId}
               buscar={buscarServicos}

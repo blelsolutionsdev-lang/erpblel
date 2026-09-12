@@ -19,7 +19,11 @@ import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 import { z } from 'zod'
 import { PageHeader } from '@/components/PageHeader'
-import { Paginacao, usePaginacao } from '@/components/Paginacao'
+import { Paginacao } from '@/components/Paginacao'
+import { DataTable } from '@/components/DataTable'
+import { useConfirmacao } from '@/components/ConfirmDialog'
+import { CampoMoeda } from '@/components/campos/CampoMoeda'
+import { Combobox } from '@/components/campos/Combobox'
 import { ConcluirOSDialog } from '@/components/os/ConcluirOSDialog'
 import { OsAnexos } from '@/components/os/OsAnexos'
 import { OsItensManager } from '@/components/os/OsItensManager'
@@ -41,10 +45,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Skeleton } from '@/components/ui/skeleton'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
-import { useDebounce } from '@/hooks/use-debounce'
+import { useBuscaUrl, useFiltrosUrl } from '@/hooks/use-filtros-url'
+import {
+  buscarClientes,
+  buscarEquipamentosDoCliente,
+  buscarTecnicos,
+  carregarCliente,
+  carregarEquipamento,
+  carregarTecnico,
+} from '@/lib/buscas'
 import { useAuth } from '@/lib/auth'
 import { mensagemErro, mensagemErroFuncao } from '@/lib/erros'
 import { formatCurrency, formatDate } from '@/lib/format'
@@ -106,10 +116,10 @@ export function OrdensServico() {
   const [aprovadoPor, setAprovadoPor] = useState('')
   const [osParaReprovar, setOsParaReprovar] = useState<OrdemServico | null>(null)
   const [motivoReprovacao, setMotivoReprovacao] = useState('')
-  const [busca, setBusca] = useState('')
-  const [filtroStatus, setFiltroStatus] = useState<'' | OsStatus>('')
-  const buscaDebounced = useDebounce(busca)
-  const { pagina, setPagina, de, ate } = usePaginacao(`${buscaDebounced}|${filtroStatus}`)
+  const { pedirConfirmacao, dialogoConfirmacao } = useConfirmacao()
+  const { filtros, definir, pagina, setPagina, de, ate } = useFiltrosUrl({ q: '', status: '' })
+  const { texto: busca, setTexto: setBusca } = useBuscaUrl(filtros.q, (q) => definir({ q }))
+  const filtroStatus = filtros.status as '' | OsStatus
 
   const podeCriar = hasPermission('os.criar')
   const podeEditarTudo = hasPermission('os.editar')
@@ -120,9 +130,9 @@ export function OrdensServico() {
     isLoading,
     isFetching,
   } = useQuery({
-    queryKey: ['ordens_servico', buscaDebounced, filtroStatus, pagina],
+    queryKey: ['ordens_servico', filtros.q, filtroStatus, pagina],
     queryFn: async () => {
-      const termo = buscaDebounced.trim()
+      const termo = filtros.q.trim()
       const soNumeros = /^\d+$/.test(termo)
 
       let query = supabase
@@ -165,40 +175,13 @@ export function OrdensServico() {
     },
   })
 
-  const { data: clientes } = useQuery({
-    queryKey: ['clientes-select'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('clientes')
-        .select('id, nome')
-        .eq('ativo', true)
-        .order('nome')
-        .limit(500)
-      if (error) throw error
-      return data
-    },
-  })
-
-  const { data: tecnicos } = useQuery({
-    queryKey: ['tecnicos-select'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, nome')
-        .eq('ativo', true)
-        .order('nome')
-        .limit(500)
-      if (error) throw error
-      return data
-    },
-  })
-
   const {
     register,
     handleSubmit,
     reset,
     setValue,
     watch,
+    control,
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -206,22 +189,6 @@ export function OrdensServico() {
   })
 
   const clienteId = watch('cliente_id')
-
-  // Equipamento é do cliente: a lista muda junto com a seleção do cliente.
-  const { data: equipamentos } = useQuery({
-    queryKey: ['equipamentos-select', clienteId],
-    enabled: !!clienteId,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('equipamentos')
-        .select('id, tipo, marca, modelo, numero_serie')
-        .eq('cliente_id', clienteId)
-        .eq('ativo', true)
-        .order('created_at')
-      if (error) throw error
-      return data
-    },
-  })
 
   useEffect(() => {
     if (open && editing) {
@@ -387,6 +354,23 @@ export function OrdensServico() {
       setOsParaConcluir(os)
       return
     }
+
+    // Cancelar era um item qualquer do seletor, mas desfaz a OS inteira:
+    // devolve as peças ao estoque e cancela o título gerado.
+    if (status === 'cancelada') {
+      pedirConfirmacao({
+        titulo: `Cancelar a OS #${os.numero}?`,
+        destrutivo: true,
+        rotuloConfirmar: 'Cancelar OS',
+        descricao:
+          os.status === 'concluida'
+            ? 'As peças baixadas voltam para o estoque e a conta a receber é cancelada (se ainda não houver recebimento).'
+            : 'A OS sai do fluxo de trabalho. Dá para reabrir depois mudando o status.',
+        aoConfirmar: () => statusMutation.mutateAsync({ os, status }),
+      })
+      return
+    }
+
     statusMutation.mutate({ os, status })
   }
 
@@ -417,6 +401,7 @@ export function OrdensServico() {
 
   return (
     <div>
+      {dialogoConfirmacao}
       <PageHeader
         title="Ordens de serviço"
         description="Orçamento, execução, garantia e faturamento — com peças e serviços baixando estoque na conclusão"
@@ -449,7 +434,7 @@ export function OrdensServico() {
             })),
           ]}
           value={filtroStatus || 'todos'}
-          onValueChange={(v) => setFiltroStatus(!v || v === 'todos' ? '' : (v as OsStatus))}
+          onValueChange={(v) => definir({ status: !v || v === 'todos' ? '' : v })}
         >
           <SelectTrigger className="w-52">
             <SelectValue />
@@ -465,210 +450,211 @@ export function OrdensServico() {
         </Select>
       </div>
 
-      <div className="rounded-lg border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>OS</TableHead>
-              <TableHead>Cliente / equipamento</TableHead>
-              <TableHead>Técnico</TableHead>
-              <TableHead>Prazo</TableHead>
-              <TableHead>Valor total</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="w-64" />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading &&
-              Array.from({ length: 4 }).map((_, i) => (
-                <TableRow key={i}>
-                  <TableCell colSpan={7}>
-                    <Skeleton className="h-6 w-full" />
-                  </TableCell>
-                </TableRow>
-              ))}
-
-            {!isLoading && ordens?.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
-                  {buscaDebounced || filtroStatus
-                    ? 'Nenhuma OS encontrada com esses filtros.'
-                    : 'Nenhuma ordem de serviço aberta ainda.'}
-                </TableCell>
-              </TableRow>
-            )}
-
-            {ordens?.map((os) => {
-              const souTecnicoResponsavel = !!user && os.tecnico_id === user.id
-              const podeAgir = podeEditarTudo || souTecnicoResponsavel
+      <DataTable
+        linhas={ordens}
+        carregando={isLoading}
+        chave={(os) => os.id}
+        vazio={
+          filtros.q || filtroStatus
+            ? 'Nenhuma OS encontrada com esses filtros.'
+            : 'Nenhuma ordem de serviço aberta ainda.'
+        }
+        colunas={[
+          {
+            titulo: 'OS',
+            mobile: 'titulo',
+            celula: (os) => (
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="font-medium">#{os.numero}</span>
+                <Badge variant={prioridadeVariant[os.prioridade]} className="text-[10px]">
+                  {prioridadeLabel[os.prioridade]}
+                </Badge>
+                {os.eh_garantia && (
+                  <Badge variant="outline" className="gap-1 text-[10px]">
+                    <ShieldAlert className="size-3" />
+                    Garantia
+                  </Badge>
+                )}
+                <Badge variant={statusVariant[os.status]}>{statusLabel[os.status]}</Badge>
+              </div>
+            ),
+          },
+          {
+            titulo: 'Cliente / equipamento',
+            celula: (os) => (
+              <div>
+                <div>{os.cliente?.nome ?? '\u2014'}</div>
+                <div className="text-xs text-muted-foreground">
+                  {os.equipamento
+                    ? [os.equipamento.tipo, os.equipamento.marca, os.equipamento.modelo]
+                        .filter(Boolean)
+                        .join(' \u00b7 ') || 'Equipamento'
+                    : 'Sem equipamento'}
+                </div>
+              </div>
+            ),
+          },
+          { titulo: 'Técnico', celula: (os) => os.tecnico?.nome ?? '\u2014' },
+          {
+            titulo: 'Prazo',
+            celula: (os) => {
               const atraso = diasAtraso(os.data_prevista, os.status)
               const emGarantia = garantiaVigente(os.garantia_ate)
-
               return (
-                <TableRow key={os.id}>
-                  <TableCell className="font-medium">
-                    #{os.numero}
-                    {os.eh_garantia && (
-                      <Badge variant="outline" className="ml-2 gap-1">
-                        <ShieldAlert className="size-3" />
-                        Garantia
-                      </Badge>
-                    )}
-                    <div className="mt-1">
-                      <Badge variant={prioridadeVariant[os.prioridade]} className="text-[10px]">
-                        {prioridadeLabel[os.prioridade]}
-                      </Badge>
+                <div>
+                  <div className="text-sm">
+                    {os.data_prevista ? formatDate(os.data_prevista) : '\u2014'}
+                  </div>
+                  {atraso > 0 && (
+                    <Badge variant="destructive" className="gap-1 text-[10px]">
+                      <AlarmClock className="size-3" />
+                      {atraso}d de atraso
+                    </Badge>
+                  )}
+                  {os.status === 'concluida' && os.garantia_ate && (
+                    <div className="text-[11px] text-muted-foreground">
+                      Garantia {emGarantia ? 'até' : 'venceu em'} {formatDate(os.garantia_ate)}
                     </div>
-                  </TableCell>
-                  <TableCell>
-                    <div>{os.cliente?.nome ?? '—'}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {os.equipamento
-                        ? [os.equipamento.tipo, os.equipamento.marca, os.equipamento.modelo]
-                            .filter(Boolean)
-                            .join(' · ') || 'Equipamento'
-                        : 'Sem equipamento'}
-                    </div>
-                  </TableCell>
-                  <TableCell>{os.tecnico?.nome ?? '—'}</TableCell>
-                  <TableCell>
-                    <div className="text-sm">
-                      {os.data_prevista ? formatDate(os.data_prevista) : '—'}
-                    </div>
-                    {atraso > 0 && (
-                      <Badge variant="destructive" className="gap-1 text-[10px]">
-                        <AlarmClock className="size-3" />
-                        {atraso}d de atraso
-                      </Badge>
-                    )}
-                    {os.status === 'concluida' && os.garantia_ate && (
-                      <div className="text-[11px] text-muted-foreground">
-                        Garantia {emGarantia ? 'até' : 'venceu em'} {formatDate(os.garantia_ate)}
-                      </div>
-                    )}
-                  </TableCell>
-                  <TableCell>{formatCurrency(os.valor_total)}</TableCell>
-                  <TableCell>
-                    {podeEditarTudo && os.status !== 'orcamento' ? (
-                      <Select
-                        value={os.status}
-                        onValueChange={(status) => status && mudarStatus(os, status as OsStatus)}
-                      >
-                        <SelectTrigger className="h-8 w-44">
-                          <Badge variant={statusVariant[os.status]} className="pointer-events-none">
-                            {statusLabel[os.status]}
-                          </Badge>
-                        </SelectTrigger>
-                        <SelectContent>
-                          {statusManuais.map((status) => (
-                            <SelectItem key={status} value={status}>
-                              {statusLabel[status]}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <Badge variant={statusVariant[os.status]}>{statusLabel[os.status]}</Badge>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-1">
-                      {podeAgir && (
-                        <Button size="xs" variant="outline" onClick={() => abrirEdicao(os)}>
-                          <Pencil className="size-3.5" />
-                          Itens
-                        </Button>
-                      )}
-
-                      {podeAgir && ['aberta', 'aguardando_peca'].includes(os.status) && (
-                        <Button
-                          size="xs"
-                          variant="outline"
-                          title="Enviar orçamento para aprovação do cliente"
-                          onClick={() => orcamentoMutation.mutate(os)}
-                          disabled={orcamentoMutation.isPending}
-                        >
-                          <Send className="size-3.5" />
-                          Orçar
-                        </Button>
-                      )}
-
-                      {podeAgir && os.status === 'orcamento' && (
-                        <>
-                          <Button
-                            size="xs"
-                            onClick={() => {
-                              setOsParaAprovar(os)
-                              setAprovadoPor(os.cliente?.nome ?? '')
-                            }}
-                          >
-                            <ThumbsUp className="size-3.5" />
-                            Aprovar
-                          </Button>
-                          <Button
-                            size="xs"
-                            variant="outline"
-                            onClick={() => setOsParaReprovar(os)}
-                          >
-                            <ThumbsDown className="size-3.5" />
-                            Reprovar
-                          </Button>
-                        </>
-                      )}
-
-                      {souTecnicoResponsavel && !podeEditarTudo && os.status === 'aberta' && (
-                        <Button
-                          size="xs"
-                          variant="outline"
-                          onClick={() => mudarStatus(os, 'em_andamento')}
-                          disabled={statusMutation.isPending}
-                        >
-                          <PlayCircle className="size-3.5" />
-                          Iniciar
-                        </Button>
-                      )}
-                      {souTecnicoResponsavel && !podeEditarTudo && os.status === 'em_andamento' && (
-                        <Button size="xs" onClick={() => setOsParaConcluir(os)}>
-                          Concluir
-                        </Button>
-                      )}
-
-                      <Button
-                        size="xs"
-                        variant="ghost"
-                        title="Imprimir OS"
-                        onClick={() => window.open(`/os/${os.id}/imprimir`, '_blank')}
-                      >
-                        <Printer className="size-3.5" />
-                      </Button>
-
-                      {podeAgir && podeCriar && os.status === 'concluida' && (
-                        <Button size="xs" variant="outline" onClick={() => setOsParaGarantia(os)}>
-                          <ShieldAlert className="size-3.5" />
-                          Garantia
-                        </Button>
-                      )}
-
-                      {podeEmitirNota && os.status === 'concluida' && (
-                        <Button
-                          size="xs"
-                          variant="outline"
-                          title="Emitir NFC-e desta OS"
-                          onClick={() => nfceMutation.mutate(os)}
-                          disabled={nfceMutation.isPending}
-                        >
-                          <Receipt className="size-3.5" />
-                          NFC-e
-                        </Button>
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
+                  )}
+                </div>
               )
-            })}
-          </TableBody>
-        </Table>
-      </div>
+            },
+          },
+          {
+            titulo: 'Valor total',
+            alinhar: 'direita',
+            celula: (os) => formatCurrency(os.valor_total),
+          },
+          {
+            titulo: 'Mudar status',
+            mobile: 'oculta',
+            celula: (os) =>
+              podeEditarTudo && os.status !== 'orcamento' ? (
+                <Select
+                  value={os.status}
+                  onValueChange={(status) => status && mudarStatus(os, status as OsStatus)}
+                >
+                  <SelectTrigger className="h-8 w-44" aria-label={`Status da OS ${os.numero}`}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {statusManuais.map((status) => (
+                      <SelectItem key={status} value={status}>
+                        {statusLabel[status]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : null,
+          },
+        ]}
+        acoes={(os) => {
+          const souTecnicoResponsavel = !!user && os.tecnico_id === user.id
+          const podeAgir = podeEditarTudo || souTecnicoResponsavel
+
+          return (
+            <>
+              {podeAgir && (
+                <Button size="xs" variant="outline" onClick={() => abrirEdicao(os)}>
+                  <Pencil className="size-3.5" />
+                  Itens
+                </Button>
+              )}
+
+              {podeAgir && ['aberta', 'aguardando_peca', 'reprovada'].includes(os.status) && (
+                <Button
+                  size="xs"
+                  variant="outline"
+                  title="Enviar orçamento para aprovação do cliente"
+                  onClick={() => orcamentoMutation.mutate(os)}
+                  disabled={orcamentoMutation.isPending}
+                >
+                  <Send className="size-3.5" />
+                  Orçar
+                </Button>
+              )}
+
+              {podeAgir && os.status === 'orcamento' && (
+                <>
+                  <Button
+                    size="xs"
+                    onClick={() => {
+                      setOsParaAprovar(os)
+                      setAprovadoPor(os.cliente?.nome ?? '')
+                    }}
+                  >
+                    <ThumbsUp className="size-3.5" />
+                    Aprovar
+                  </Button>
+                  <Button size="xs" variant="outline" onClick={() => setOsParaReprovar(os)}>
+                    <ThumbsDown className="size-3.5" />
+                    Reprovar
+                  </Button>
+                </>
+              )}
+
+              {souTecnicoResponsavel && !podeEditarTudo && os.status === 'aberta' && (
+                <Button
+                  size="xs"
+                  variant="outline"
+                  onClick={() => mudarStatus(os, 'em_andamento')}
+                  disabled={statusMutation.isPending}
+                >
+                  <PlayCircle className="size-3.5" />
+                  Iniciar
+                </Button>
+              )}
+              {souTecnicoResponsavel && !podeEditarTudo && os.status === 'em_andamento' && (
+                <Button size="xs" onClick={() => setOsParaConcluir(os)}>
+                  Concluir
+                </Button>
+              )}
+
+              <Button
+                size="xs"
+                variant="ghost"
+                title="Imprimir OS"
+                onClick={() => window.open(`/os/${os.id}/imprimir`, '_blank')}
+              >
+                <Printer className="size-3.5" />
+              </Button>
+
+              {podeAgir && podeCriar && os.status === 'concluida' && (
+                <Button size="xs" variant="outline" onClick={() => setOsParaGarantia(os)}>
+                  <ShieldAlert className="size-3.5" />
+                  Garantia
+                </Button>
+              )}
+
+              {podeEmitirNota && os.status === 'concluida' && (
+                <Button
+                  size="xs"
+                  variant="outline"
+                  title="Emitir NFC-e desta OS"
+                  onClick={() => nfceMutation.mutate(os)}
+                  disabled={nfceMutation.isPending}
+                >
+                  <Receipt className="size-3.5" />
+                  NFC-e
+                </Button>
+              )}
+
+              {/* No celular a coluna de status some: o cancelamento fica aqui. */}
+              {podeEditarTudo && os.status !== 'orcamento' && os.status !== 'cancelada' && (
+                <Button
+                  size="xs"
+                  variant="ghost"
+                  className="md:hidden"
+                  onClick={() => mudarStatus(os, 'cancelada')}
+                >
+                  Cancelar OS
+                </Button>
+              )}
+            </>
+          )
+        }}
+      />
+
 
       <Paginacao
         pagina={pagina}
@@ -717,89 +703,59 @@ export function OrdensServico() {
             className="space-y-4"
             onSubmit={handleSubmit((values) => saveMutation.mutate(values))}
           >
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label>Cliente</Label>
-                <Select
-                  items={clientes?.map((c) => ({ value: c.id, label: c.nome })) ?? []}
-                  value={clienteId}
-                  onValueChange={(v) => {
-                    setValue('cliente_id', v ?? '')
+                <Label htmlFor="os_cliente">Cliente</Label>
+                <Combobox
+                  id="os_cliente"
+                  queryKey="clientes"
+                  valor={clienteId}
+                  buscar={buscarClientes}
+                  carregarSelecionado={carregarCliente}
+                  placeholder="Busque pelo nome ou CNPJ"
+                  disabled={!podeEditarCabecalho}
+                  aoSelecionar={(v) => {
+                    setValue('cliente_id', v)
                     setValue('equipamento_id', '')
                   }}
-                  disabled={!podeEditarCabecalho}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione um cliente" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {clientes?.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.nome}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                />
                 {errors.cliente_id && (
                   <p className="text-xs text-destructive">{errors.cliente_id.message}</p>
                 )}
               </div>
 
               <div className="space-y-2">
-                <Label>Equipamento</Label>
-                <Select
-                  items={
-                    equipamentos?.map((e) => ({
-                      value: e.id,
-                      label:
-                        [e.tipo, e.marca, e.modelo].filter(Boolean).join(' ') ||
-                        e.numero_serie ||
-                        'Equipamento',
-                    })) ?? []
-                  }
-                  value={equipamentoId}
-                  onValueChange={(v) => setValue('equipamento_id', v ?? '')}
+                <Label htmlFor="os_equipamento">Equipamento</Label>
+                <Combobox
+                  id="os_equipamento"
+                  queryKey={`equipamentos-${clienteId || 'sem-cliente'}`}
+                  valor={equipamentoId ?? ''}
+                  buscar={buscarEquipamentosDoCliente(clienteId)}
+                  carregarSelecionado={carregarEquipamento}
+                  placeholder={clienteId ? 'Selecione' : 'Escolha o cliente antes'}
+                  vazio="Nenhum equipamento cadastrado para este cliente."
                   disabled={!podeEditarCabecalho || !clienteId}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder={clienteId ? 'Selecione' : 'Escolha o cliente antes'} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {equipamentos?.map((e) => (
-                      <SelectItem key={e.id} value={e.id}>
-                        {[e.tipo, e.marca, e.modelo].filter(Boolean).join(' ') ||
-                          e.numero_serie ||
-                          'Equipamento'}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  aoSelecionar={(v) => setValue('equipamento_id', v)}
+                />
                 <p className="text-xs text-muted-foreground">
                   Cadastre os equipamentos na ficha do cliente.
                 </p>
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid gap-4 sm:grid-cols-3">
               <div className="space-y-2">
-                <Label>Técnico responsável</Label>
-                <Select
-                  items={tecnicos?.map((t) => ({ value: t.id, label: t.nome })) ?? []}
-                  value={tecnicoId}
-                  onValueChange={(v) => setValue('tecnico_id', v ?? '')}
+                <Label htmlFor="os_tecnico">Técnico responsável</Label>
+                <Combobox
+                  id="os_tecnico"
+                  queryKey="tecnicos"
+                  valor={tecnicoId ?? ''}
+                  buscar={buscarTecnicos}
+                  carregarSelecionado={carregarTecnico}
+                  placeholder="Sem técnico"
                   disabled={!podeEditarCabecalho}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sem técnico" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {tecnicos?.map((t) => (
-                      <SelectItem key={t.id} value={t.id}>
-                        {t.nome}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  aoSelecionar={(v) => setValue('tecnico_id', v)}
+                />
               </div>
 
               <div className="space-y-2">
@@ -853,28 +809,14 @@ export function OrdensServico() {
             </p>
           )}
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid gap-4 sm:grid-cols-3">
             <div className="space-y-2">
               <Label htmlFor="valor_acrescimo">Acréscimo</Label>
-              <Input
-                id="valor_acrescimo"
-                type="number"
-                step="0.01"
-                min={0}
-                form="os-form"
-                {...register('valor_acrescimo')}
-              />
+              <CampoMoeda id="valor_acrescimo" control={control} name="valor_acrescimo" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="valor_desconto">Desconto</Label>
-              <Input
-                id="valor_desconto"
-                type="number"
-                step="0.01"
-                min={0}
-                form="os-form"
-                {...register('valor_desconto')}
-              />
+              <CampoMoeda id="valor_desconto" control={control} name="valor_desconto" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="garantia_dias">Garantia (dias)</Label>

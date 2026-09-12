@@ -1,27 +1,20 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { FileWarning, KeyRound, Search, Upload } from 'lucide-react'
 import { type ChangeEvent, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { PageHeader } from '@/components/PageHeader'
+import { Combobox } from '@/components/campos/Combobox'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { buscarProdutos, carregarProduto } from '@/lib/buscas'
 import { mensagemErro, mensagemErroFuncao } from '@/lib/erros'
 import { formatCurrency } from '@/lib/format'
 import { type NFeItem, type NFeParsed, parseNFeXml } from '@/lib/nfe-xml'
 import { supabase } from '@/lib/supabase'
-
-type ProdutoResumo = { id: string; nome: string; ncm: string | null; codigo_barras: string | null }
 
 type ItemMatch = {
   item: NFeItem
@@ -42,8 +35,6 @@ const origemMatchLabel: Record<string, string> = {
 }
 
 type OrigemEntrada = 'compra_xml' | 'compra_pdf' | 'compra_chave'
-
-const CRIAR_NOVO = '__novo__'
 
 // 10 MB de PDF; acima disso o base64 estoura o limite de payload da Edge
 // Function e o erro que volta não explica nada.
@@ -78,22 +69,6 @@ export function Entradas() {
   const [chave, setChave] = useState('')
   const [chaveError, setChaveError] = useState<string | null>(null)
   const [chaveLoading, setChaveLoading] = useState(false)
-
-  // Uma única leitura da lista de produtos, compartilhada entre o casamento
-  // automático e os selects da tela de revisão.
-  const { data: produtos } = useQuery({
-    queryKey: ['produtos-select-nfe'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('produtos')
-        .select('id, nome, ncm, codigo_barras')
-        .order('nome')
-        .limit(2000)
-      if (error) throw error
-      return data as ProdutoResumo[]
-    },
-    enabled: !!parsed,
-  })
 
   async function aplicarResultado(result: NFeParsed, origemMetodo: OrigemEntrada) {
     setOrigem(origemMetodo)
@@ -439,34 +414,21 @@ export function Entradas() {
                           casado por {origemMatchLabel[m.origemMatch] ?? m.origemMatch}
                         </p>
                       )}
-                      <Select
-                        items={[
-                          { value: CRIAR_NOVO, label: '+ Criar novo produto' },
-                          ...(produtos?.map((p) => ({ value: p.id, label: p.nome })) ?? []),
-                        ]}
-                        value={m.produtoId || CRIAR_NOVO}
-                        onValueChange={(v) =>
+                      <Combobox
+                        queryKey="produtos"
+                        valor={m.produtoId}
+                        buscar={buscarProdutos}
+                        carregarSelecionado={carregarProduto}
+                        placeholder="+ Criar novo produto"
+                        limparRotulo="Criar produto novo em vez de casar"
+                        aoSelecionar={(v) =>
                           setMatches((prev) =>
                             prev.map((pm, i) =>
-                              i === index
-                                ? { ...pm, produtoId: v === CRIAR_NOVO ? '' : (v ?? ''), origemMatch: null }
-                                : pm,
+                              i === index ? { ...pm, produtoId: v, origemMatch: null } : pm,
                             ),
                           )
                         }
-                      >
-                        <SelectTrigger className="h-8 w-full">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value={CRIAR_NOVO}>+ Criar novo produto</SelectItem>
-                          {produtos?.map((p) => (
-                            <SelectItem key={p.id} value={p.id}>
-                              {p.nome}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      />
                     </TableCell>
                   </TableRow>
                 ))}

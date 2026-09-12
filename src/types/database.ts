@@ -1456,6 +1456,8 @@ export type Database = {
         }
         Returns: number
       }
+      contagem_produtos_por_categoria: { Args: never; Returns: Json }
+      totais_caixa: { Args: { p_ate: string; p_de: string }; Returns: Json }
       concluir_os: {
         Args: {
           p_assinatura_nome: string

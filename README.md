@@ -26,7 +26,7 @@ npm run dev
 | `VITE_SUPABASE_URL` | Supabase → Project Settings → API |
 | `VITE_SUPABASE_PUBLISHABLE_KEY` | idem (chave publishable/anon) |
 
-Scripts: `npm run dev`, `npm run build`, `npm run lint`, `npm run preview`.
+Scripts: `npm run dev`, `npm run build`, `npm test`, `npm run lint`, `npm run preview`.
 
 ## Fluxo do negócio
 
@@ -65,6 +65,7 @@ Schema versionado em `supabase/migrations/`:
 | `20260912004000_auditoria.sql` | trilha de auditoria |
 | `20260912005000_relatorios_e_estoque_disponivel.sql` | relatórios gerenciais e saldo disponível |
 | `20260912006000_fiscal_nfce.sql` | dados do emitente e emissão de NFC-e |
+| `20260912007000_rpcs_agregacoes_front.sql` | agregações que estavam sendo feitas no navegador |
 
 Para aplicar num projeto novo: `supabase db push`. No projeto que já estava no
 ar, essas versões foram registradas como aplicadas no histórico do Supabase, e
@@ -135,3 +136,23 @@ Secrets (Project Settings → Edge Functions → Secrets):
 > da empresa na SEFAZ. O código está completo (payload montado no banco, envio,
 > consulta e gravação do retorno), mas **não foi exercitado contra a SEFAZ**
 > neste projeto — teste primeiro em homologação.
+
+## Convenções do front
+
+| Precisa de | Use |
+| --- | --- |
+| Listagem | `<DataTable>` — vira cartão abaixo de `md`, tabela acima |
+| Busca/filtro/página | `useFiltrosUrl` + `useBuscaUrl` (estado vai para a querystring) |
+| Valor em dinheiro | `<CampoMoeda>` (formato pt-BR, entrega `number`) |
+| CPF/CNPJ, telefone, CEP | `<CampoMascarado>` + validação de `@/lib/documentos` |
+| Escolher cliente/produto/serviço/técnico | `<Combobox>` com as funções de `@/lib/buscas` (busca no servidor) |
+| Ação sem volta | `useConfirmacao()` — nunca execute direto no `onClick` |
+| Erro de API | `mensagemErro` / `mensagemErroFuncao` de `@/lib/erros` |
+| Tema | `useTema()` de `@/lib/tema` (o anti-flash fica no `index.html`) |
+
+Testes: `npm test` (Vitest + Testing Library).
+
+```bash
+npm test          # roda uma vez
+npm run test:watch
+```

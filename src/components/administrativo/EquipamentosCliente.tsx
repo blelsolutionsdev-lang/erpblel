@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { HardDrive, Plus, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
+import { useConfirmacao } from '@/components/ConfirmDialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -26,6 +27,7 @@ export function EquipamentosCliente({
   editavel?: boolean
 }) {
   const queryClient = useQueryClient()
+  const { pedirConfirmacao, dialogoConfirmacao } = useConfirmacao()
   const [novo, setNovo] = useState(vazio)
 
   const { data: equipamentos, isLoading } = useQuery({
@@ -88,8 +90,13 @@ export function EquipamentosCliente({
     onError: (error: unknown) => toast.error(mensagemErro(error)),
   })
 
+  function descrever(eq: Equipamento) {
+    return [eq.tipo, eq.marca, eq.modelo].filter(Boolean).join(' · ') || eq.numero_serie || 'Equipamento'
+  }
+
   return (
     <div className="space-y-3 rounded-lg border p-3">
+      {dialogoConfirmacao}
       <p className="flex items-center gap-1.5 text-sm font-medium">
         <HardDrive className="size-4" />
         Equipamentos do cliente
@@ -109,9 +116,7 @@ export function EquipamentosCliente({
           {equipamentos.map((eq) => (
             <div key={eq.id} className="flex items-center gap-2 text-sm">
               <div className="flex-1 truncate">
-                <span className="font-medium">
-                  {[eq.tipo, eq.marca, eq.modelo].filter(Boolean).join(' · ') || 'Equipamento'}
-                </span>
+                <span className="font-medium">{descrever(eq)}</span>
                 {eq.numero_serie && (
                   <span className="ml-2 text-xs text-muted-foreground">nº {eq.numero_serie}</span>
                 )}
@@ -129,7 +134,20 @@ export function EquipamentosCliente({
                   variant="ghost"
                   size="icon-sm"
                   title="Excluir equipamento"
-                  onClick={() => removeMutation.mutate(eq.id)}
+                  onClick={() =>
+                    pedirConfirmacao({
+                      titulo: 'Excluir equipamento',
+                      destrutivo: true,
+                      rotuloConfirmar: 'Excluir',
+                      descricao: (
+                        <>
+                          O equipamento <strong>{descrever(eq)}</strong> some do cadastro. Ordens de
+                          serviço antigas ficam sem o vínculo. Não dá para desfazer.
+                        </>
+                      ),
+                      aoConfirmar: () => removeMutation.mutateAsync(eq.id),
+                    })
+                  }
                 >
                   <Trash2 className="size-3.5" />
                 </Button>
@@ -140,7 +158,7 @@ export function EquipamentosCliente({
       )}
 
       {editavel && (
-        <div className="grid grid-cols-2 gap-2 border-t pt-3 sm:grid-cols-5">
+        <div className="grid grid-cols-1 gap-2 border-t pt-3 sm:grid-cols-5">
           <Input
             className="h-8"
             placeholder="Tipo (ar, geladeira...)"

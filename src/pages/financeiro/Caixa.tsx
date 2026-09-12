@@ -1,14 +1,13 @@
 import { useQuery } from '@tanstack/react-query'
 import { ArrowDownLeft, ArrowUpRight, Wallet } from 'lucide-react'
-import { useState } from 'react'
 import { PageHeader } from '@/components/PageHeader'
-import { Paginacao, usePaginacao } from '@/components/Paginacao'
+import { Paginacao } from '@/components/Paginacao'
+import { DataTable } from '@/components/DataTable'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Skeleton } from '@/components/ui/skeleton'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { useFiltrosUrl } from '@/hooks/use-filtros-url'
 import { formatCurrency, formatDate } from '@/lib/format'
 import { supabase } from '@/lib/supabase'
 import type { Tables } from '@/types/database'
@@ -27,9 +26,15 @@ function primeiroDiaDoMes() {
  * início e nunca recebia lançamento nenhum.
  */
 export function Caixa() {
-  const [de, setDe] = useState(primeiroDiaDoMes)
-  const [ate, setAte] = useState(() => new Date().toISOString().slice(0, 10))
-  const { pagina, setPagina, de: rangeDe, ate: rangeAte } = usePaginacao(`${de}|${ate}`)
+  const {
+    filtros,
+    definir,
+    pagina,
+    setPagina,
+    de: rangeDe,
+    ate: rangeAte,
+  } = useFiltrosUrl({ de: primeiroDiaDoMes(), ate: new Date().toISOString().slice(0, 10) })
+  const { de, ate } = filtros
 
   const {
     data: resultado,
@@ -51,22 +56,14 @@ export function Caixa() {
     },
   })
 
+  // Somatório feito no banco: antes a tela consultava o mesmo período duas
+  // vezes, uma paginada para a lista e outra inteira só para somar.
   const { data: totais } = useQuery({
     queryKey: ['caixa-totais', de, ate],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('caixa_movimentacoes')
-        .select('tipo, valor')
-        .gte('data_movimento', de)
-        .lte('data_movimento', ate)
+      const { data, error } = await supabase.rpc('totais_caixa', { p_de: de, p_ate: ate })
       if (error) throw error
-      const entradas = (data ?? [])
-        .filter((m) => m.tipo === 'entrada')
-        .reduce((acc, m) => acc + Number(m.valor), 0)
-      const saidas = (data ?? [])
-        .filter((m) => m.tipo === 'saida')
-        .reduce((acc, m) => acc + Number(m.valor), 0)
-      return { entradas, saidas, saldo: entradas - saidas }
+      return data as unknown as { entradas: number; saidas: number; saldo: number }
     },
   })
 
@@ -84,13 +81,13 @@ export function Caixa() {
           <Label htmlFor="caixa_de" className="text-xs text-muted-foreground">
             De
           </Label>
-          <Input id="caixa_de" type="date" value={de} onChange={(e) => setDe(e.target.value)} className="h-8" />
+          <Input id="caixa_de" type="date" value={de} onChange={(e) => definir({ de: e.target.value })} className="h-8" />
         </div>
         <div className="space-y-1">
           <Label htmlFor="caixa_ate" className="text-xs text-muted-foreground">
             Até
           </Label>
-          <Input id="caixa_ate" type="date" value={ate} onChange={(e) => setAte(e.target.value)} className="h-8" />
+          <Input id="caixa_ate" type="date" value={ate} onChange={(e) => definir({ ate: e.target.value })} className="h-8" />
         </div>
       </div>
 
@@ -126,66 +123,48 @@ export function Caixa() {
         </Card>
       </div>
 
-      <div className="rounded-lg border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Data</TableHead>
-              <TableHead>Descrição</TableHead>
-              <TableHead>Forma</TableHead>
-              <TableHead>Responsável</TableHead>
-              <TableHead className="text-right">Valor</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading &&
-              Array.from({ length: 5 }).map((_, i) => (
-                <TableRow key={i}>
-                  <TableCell colSpan={5}>
-                    <Skeleton className="h-6 w-full" />
-                  </TableCell>
-                </TableRow>
-              ))}
-
-            {!isLoading && movimentos?.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={5} className="py-10 text-center text-muted-foreground">
-                  Nenhum lançamento no período.
-                </TableCell>
-              </TableRow>
-            )}
-
-            {movimentos?.map((mov) => (
-              <TableRow key={mov.id}>
-                <TableCell className="whitespace-nowrap">{formatDate(mov.data_movimento)}</TableCell>
-                <TableCell>
-                  <Badge variant={mov.tipo === 'entrada' ? 'default' : 'secondary'} className="mr-2 gap-1">
-                    {mov.tipo === 'entrada' ? (
-                      <ArrowDownLeft className="size-3" />
-                    ) : (
-                      <ArrowUpRight className="size-3" />
-                    )}
-                    {mov.tipo === 'entrada' ? 'Entrada' : 'Saída'}
-                  </Badge>
-                  {mov.descricao ?? '—'}
-                </TableCell>
-                <TableCell className="text-sm text-muted-foreground">
-                  {mov.forma_pagamento ?? '—'}
-                </TableCell>
-                <TableCell className="text-sm">{mov.autor?.nome ?? '—'}</TableCell>
-                <TableCell
-                  className={`text-right font-medium ${
-                    mov.tipo === 'entrada' ? 'text-emerald-600' : 'text-amber-600'
-                  }`}
-                >
-                  {mov.tipo === 'entrada' ? '+' : '−'}
-                  {formatCurrency(mov.valor)}
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+      <DataTable
+        linhas={movimentos}
+        carregando={isLoading}
+        chave={(mov) => mov.id}
+        vazio="Nenhum lançamento no período."
+        colunas={[
+          {
+            titulo: 'Descrição',
+            mobile: 'titulo',
+            celula: (mov) => (
+              <div className="flex items-center gap-2">
+                <Badge variant={mov.tipo === 'entrada' ? 'default' : 'secondary'} className="gap-1">
+                  {mov.tipo === 'entrada' ? (
+                    <ArrowDownLeft className="size-3" />
+                  ) : (
+                    <ArrowUpRight className="size-3" />
+                  )}
+                  {mov.tipo === 'entrada' ? 'Entrada' : 'Saída'}
+                </Badge>
+                <span className="min-w-0 truncate">{mov.descricao ?? '—'}</span>
+              </div>
+            ),
+          },
+          { titulo: 'Data', celula: (mov) => formatDate(mov.data_movimento) },
+          { titulo: 'Forma', celula: (mov) => mov.forma_pagamento ?? '—' },
+          { titulo: 'Responsável', celula: (mov) => mov.autor?.nome ?? '—' },
+          {
+            titulo: 'Valor',
+            alinhar: 'direita',
+            celula: (mov) => (
+              <span
+                className={`font-medium ${
+                  mov.tipo === 'entrada' ? 'text-emerald-600' : 'text-amber-600'
+                }`}
+              >
+                {mov.tipo === 'entrada' ? '+' : '−'}
+                {formatCurrency(mov.valor)}
+              </span>
+            ),
+          },
+        ]}
+      />
 
       <Paginacao
         pagina={pagina}

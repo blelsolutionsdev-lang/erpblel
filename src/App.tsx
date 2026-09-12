@@ -6,6 +6,7 @@ import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
 import { AppShell } from '@/components/layout/AppShell'
 import { AuthProvider } from '@/lib/auth'
+import { TemaProvider } from '@/lib/tema'
 import { Login } from '@/pages/auth/Login'
 import { RedefinirSenha } from '@/pages/auth/RedefinirSenha'
 import { Dashboard } from '@/pages/Dashboard'
@@ -51,119 +52,123 @@ function CarregandoTela() {
 export default function App() {
   return (
     <ErrorBoundary>
-      <QueryClientProvider client={queryClient}>
-        <AuthProvider>
-          <BrowserRouter>
-            <Suspense fallback={<CarregandoTela />}>
-              <Routes>
-                <Route path="/login" element={<Login />} />
-                <Route path="/redefinir-senha" element={<RedefinirSenha />} />
+      {/* O CSS já trazia os tokens `.dark` e o next-themes já era dependência,
+          mas faltava o provider: o modo escuro nunca chegava a ser aplicado. */}
+      <TemaProvider>
+        <QueryClientProvider client={queryClient}>
+          <AuthProvider>
+            <BrowserRouter>
+              <Suspense fallback={<CarregandoTela />}>
+                <Routes>
+                  <Route path="/login" element={<Login />} />
+                  <Route path="/redefinir-senha" element={<RedefinirSenha />} />
 
-                {/* Via impressa da OS: fora do AppShell para sair limpa no papel. */}
-                <Route
-                  path="/os/:id/imprimir"
-                  element={
-                    <ProtectedRoute>
-                      <ImprimirOS />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  element={
-                    <ProtectedRoute>
-                      <AppShell />
-                    </ProtectedRoute>
-                  }
-                >
-                  <Route path="/" element={<Dashboard />} />
-
-                  <Route path="/estoque/produtos" element={<Produtos />} />
-                  <Route path="/estoque/categorias" element={<Categorias />} />
-                  <Route path="/estoque/movimentacoes" element={<Movimentacoes />} />
+                  {/* Via impressa da OS: fora do AppShell para sair limpa no papel. */}
                   <Route
-                    path="/estoque/entradas"
+                    path="/os/:id/imprimir"
                     element={
-                      <ProtectedRoute permissao="estoque.entradas.processar">
-                        <Entradas />
-                      </ProtectedRoute>
-                    }
-                  />
-
-                  <Route path="/os" element={<OrdensServico />} />
-                  <Route path="/os/servicos" element={<Servicos />} />
-
-                  <Route
-                    path="/financeiro/contas-a-receber"
-                    element={
-                      <ProtectedRoute permissao="financeiro.gerenciar">
-                        <ContasReceber />
+                      <ProtectedRoute>
+                        <ImprimirOS />
                       </ProtectedRoute>
                     }
                   />
                   <Route
-                    path="/financeiro/contas-a-pagar"
                     element={
-                      <ProtectedRoute permissao="financeiro.gerenciar">
-                        <ContasPagar />
+                      <ProtectedRoute>
+                        <AppShell />
                       </ProtectedRoute>
                     }
-                  />
+                  >
+                    <Route path="/" element={<Dashboard />} />
 
-                  <Route
-                    path="/financeiro/caixa"
-                    element={
-                      <ProtectedRoute permissao="financeiro.gerenciar">
-                        <Caixa />
-                      </ProtectedRoute>
-                    }
-                  />
+                    <Route path="/estoque/produtos" element={<Produtos />} />
+                    <Route path="/estoque/categorias" element={<Categorias />} />
+                    <Route path="/estoque/movimentacoes" element={<Movimentacoes />} />
+                    <Route
+                      path="/estoque/entradas"
+                      element={
+                        <ProtectedRoute permissao="estoque.entradas.processar">
+                          <Entradas />
+                        </ProtectedRoute>
+                      }
+                    />
 
-                  <Route
-                    path="/relatorios"
-                    element={
-                      <ProtectedRoute permissao="relatorios.ver">
-                        <Relatorios />
-                      </ProtectedRoute>
-                    }
-                  />
+                    <Route path="/os" element={<OrdensServico />} />
+                    <Route path="/os/servicos" element={<Servicos />} />
 
-                  <Route path="/administrativo/clientes" element={<Clientes />} />
-                  <Route path="/administrativo/fornecedores" element={<Fornecedores />} />
-                  <Route
-                    path="/administrativo/usuarios"
-                    element={
-                      <ProtectedRoute permissao="administrativo.usuarios.gerenciar">
-                        <Usuarios />
-                      </ProtectedRoute>
-                    }
-                  />
+                    <Route
+                      path="/financeiro/contas-a-receber"
+                      element={
+                        <ProtectedRoute permissao="financeiro.gerenciar">
+                          <ContasReceber />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/financeiro/contas-a-pagar"
+                      element={
+                        <ProtectedRoute permissao="financeiro.gerenciar">
+                          <ContasPagar />
+                        </ProtectedRoute>
+                      }
+                    />
 
-                  <Route
-                    path="/administrativo/auditoria"
-                    element={
-                      <ProtectedRoute permissao="administrativo.usuarios.gerenciar">
-                        <Auditoria />
-                      </ProtectedRoute>
-                    }
-                  />
+                    <Route
+                      path="/financeiro/caixa"
+                      element={
+                        <ProtectedRoute permissao="financeiro.gerenciar">
+                          <Caixa />
+                        </ProtectedRoute>
+                      }
+                    />
 
-                  <Route
-                    path="/fiscal"
-                    element={
-                      <ProtectedRoute permissao="fiscal.gerenciar">
-                        <Fiscal />
-                      </ProtectedRoute>
-                    }
-                  />
+                    <Route
+                      path="/relatorios"
+                      element={
+                        <ProtectedRoute permissao="relatorios.ver">
+                          <Relatorios />
+                        </ProtectedRoute>
+                      }
+                    />
 
-                  <Route path="*" element={<Navigate to="/" replace />} />
-                </Route>
-              </Routes>
-            </Suspense>
-          </BrowserRouter>
-          <Toaster />
-        </AuthProvider>
-      </QueryClientProvider>
+                    <Route path="/administrativo/clientes" element={<Clientes />} />
+                    <Route path="/administrativo/fornecedores" element={<Fornecedores />} />
+                    <Route
+                      path="/administrativo/usuarios"
+                      element={
+                        <ProtectedRoute permissao="administrativo.usuarios.gerenciar">
+                          <Usuarios />
+                        </ProtectedRoute>
+                      }
+                    />
+
+                    <Route
+                      path="/administrativo/auditoria"
+                      element={
+                        <ProtectedRoute permissao="administrativo.usuarios.gerenciar">
+                          <Auditoria />
+                        </ProtectedRoute>
+                      }
+                    />
+
+                    <Route
+                      path="/fiscal"
+                      element={
+                        <ProtectedRoute permissao="fiscal.gerenciar">
+                          <Fiscal />
+                        </ProtectedRoute>
+                      }
+                    />
+
+                    <Route path="*" element={<Navigate to="/" replace />} />
+                  </Route>
+                </Routes>
+              </Suspense>
+            </BrowserRouter>
+            <Toaster />
+          </AuthProvider>
+        </QueryClientProvider>
+      </TemaProvider>
     </ErrorBoundary>
   )
 }

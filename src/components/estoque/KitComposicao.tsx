@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
+import { useConfirmacao } from '@/components/ConfirmDialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -27,6 +28,7 @@ export function KitComposicao({
   editavel?: boolean
 }) {
   const queryClient = useQueryClient()
+  const { pedirConfirmacao, dialogoConfirmacao } = useConfirmacao()
   const [novoComponenteId, setNovoComponenteId] = useState('')
   const [novaQuantidade, setNovaQuantidade] = useState('1')
 
@@ -104,6 +106,7 @@ export function KitComposicao({
 
   return (
     <div className="space-y-3 rounded-lg border p-3">
+      {dialogoConfirmacao}
       <p className="text-sm font-medium">Componentes do kit</p>
       <p className="text-xs text-muted-foreground">
         Ao dar saída de 1 unidade deste kit, o estoque de cada componente abaixo é baixado
@@ -140,7 +143,20 @@ export function KitComposicao({
                   type="button"
                   variant="ghost"
                   size="icon-sm"
-                  onClick={() => removeMutation.mutate(item.id)}
+                  onClick={() =>
+                    pedirConfirmacao({
+                      titulo: 'Remover componente do kit',
+                      destrutivo: true,
+                      rotuloConfirmar: 'Remover',
+                      descricao: (
+                        <>
+                          <strong>{item.componente.nome}</strong> deixa de ser baixado quando este kit
+                          sair do estoque.
+                        </>
+                      ),
+                      aoConfirmar: () => removeMutation.mutateAsync(item.id),
+                    })
+                  }
                 >
                   <Trash2 className="size-3.5" />
                 </Button>

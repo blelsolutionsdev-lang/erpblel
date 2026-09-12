@@ -1,9 +1,8 @@
-import { Factory, LogOut } from 'lucide-react'
+import { Factory } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
 import {
   Sidebar,
   SidebarContent,
-  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
@@ -16,7 +15,7 @@ import { useAuth } from '@/lib/auth'
 import { dashboardItem, navGroups } from './nav-config'
 
 export function AppSidebar() {
-  const { profile, signOut, hasPermission } = useAuth()
+  const { hasPermission } = useAuth()
 
   // Grupo sem nenhum item permitido não aparece — antes o menu mostrava todos
   // os módulos para todo mundo, inclusive Usuários e Fiscal.
@@ -83,29 +82,6 @@ export function AppSidebar() {
         ))}
       </SidebarContent>
 
-      <SidebarFooter>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton size="lg" className="cursor-default">
-              <div className="flex aspect-square size-8 items-center justify-center rounded-full bg-muted text-xs font-medium">
-                {(profile?.nome ?? '?').slice(0, 2).toUpperCase()}
-              </div>
-              <div className="flex flex-col gap-0.5 leading-none overflow-hidden">
-                <span className="truncate font-medium">{profile?.nome ?? 'Carregando...'}</span>
-                <span className="truncate text-xs text-muted-foreground">
-                  {profile?.role?.nome ?? '—'}
-                </span>
-              </div>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-          <SidebarMenuItem>
-            <SidebarMenuButton onClick={() => void signOut()} tooltip="Sair">
-              <LogOut />
-              <span>Sair</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
-      </SidebarFooter>
     </Sidebar>
   )
 }

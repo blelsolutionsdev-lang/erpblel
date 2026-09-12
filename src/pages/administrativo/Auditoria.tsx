@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
-import { useState } from 'react'
 import { PageHeader } from '@/components/PageHeader'
-import { Paginacao, usePaginacao } from '@/components/Paginacao'
+import { Paginacao } from '@/components/Paginacao'
+import { DataTable } from '@/components/DataTable'
 import { Badge } from '@/components/ui/badge'
 import {
   Select,
@@ -10,8 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Skeleton } from '@/components/ui/skeleton'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { useFiltrosUrl } from '@/hooks/use-filtros-url'
 import { formatDateTime } from '@/lib/format'
 import { supabase } from '@/lib/supabase'
 import type { Tables } from '@/types/database'
@@ -66,8 +65,8 @@ function resumirMudancas(mudancas: unknown): string {
 
 /** Quem mudou o quê. Antes nada disso ficava registrado. */
 export function Auditoria() {
-  const [tabela, setTabela] = useState('')
-  const { pagina, setPagina, de, ate } = usePaginacao(tabela)
+  const { filtros, definir, pagina, setPagina, de, ate } = useFiltrosUrl({ tabela: '' })
+  const { tabela } = filtros
 
   const {
     data: resultado,
@@ -106,7 +105,7 @@ export function Auditoria() {
             ...TABELAS.map((t) => ({ value: t, label: t })),
           ]}
           value={tabela || 'todas'}
-          onValueChange={(v) => setTabela(!v || v === 'todas' ? '' : v)}
+          onValueChange={(v) => definir({ tabela: !v || v === 'todas' ? '' : v })}
         >
           <SelectTrigger className="w-64">
             <SelectValue />
@@ -122,53 +121,31 @@ export function Auditoria() {
         </Select>
       </div>
 
-      <div className="rounded-lg border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-44">Quando</TableHead>
-              <TableHead>Quem</TableHead>
-              <TableHead>Tabela</TableHead>
-              <TableHead className="w-24">Ação</TableHead>
-              <TableHead>O que mudou</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading &&
-              Array.from({ length: 6 }).map((_, i) => (
-                <TableRow key={i}>
-                  <TableCell colSpan={5}>
-                    <Skeleton className="h-6 w-full" />
-                  </TableCell>
-                </TableRow>
-              ))}
-
-            {!isLoading && registros?.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={5} className="py-10 text-center text-muted-foreground">
-                  Nenhum registro de auditoria ainda.
-                </TableCell>
-              </TableRow>
-            )}
-
-            {registros?.map((r) => (
-              <TableRow key={r.id}>
-                <TableCell className="whitespace-nowrap text-sm">
-                  {formatDateTime(r.alterado_em)}
-                </TableCell>
-                <TableCell className="text-sm">{r.autor?.nome ?? 'Sistema'}</TableCell>
-                <TableCell className="text-sm text-muted-foreground">{r.tabela}</TableCell>
-                <TableCell>
+      <DataTable
+        linhas={registros}
+        carregando={isLoading}
+        chave={(r) => String(r.id)}
+        vazio="Nenhum registro de auditoria ainda."
+        colunas={[
+          {
+            titulo: 'O que mudou',
+            mobile: 'titulo',
+            celula: (r) => (
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
                   <Badge variant={acaoVariant[r.acao] ?? 'secondary'}>{r.acao}</Badge>
-                </TableCell>
-                <TableCell className="max-w-md truncate text-xs" title={JSON.stringify(r.mudancas)}>
+                  <span className="text-sm text-muted-foreground">{r.tabela}</span>
+                </div>
+                <div className="truncate text-xs" title={JSON.stringify(r.mudancas)}>
                   {resumirMudancas(r.mudancas)}
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+                </div>
+              </div>
+            ),
+          },
+          { titulo: 'Quando', celula: (r) => formatDateTime(r.alterado_em) },
+          { titulo: 'Quem', celula: (r) => r.autor?.nome ?? 'Sistema' },
+        ]}
+      />
 
       <Paginacao
         pagina={pagina}

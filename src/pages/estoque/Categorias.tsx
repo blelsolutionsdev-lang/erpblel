@@ -3,6 +3,7 @@ import { Plus, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { PageHeader } from '@/components/PageHeader'
+import { useConfirmacao } from '@/components/ConfirmDialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -22,6 +23,7 @@ export function Categorias() {
   const queryClient = useQueryClient()
   const { hasPermission } = useAuth()
   const podeGerenciar = hasPermission('estoque.produtos.gerenciar')
+  const { pedirConfirmacao, dialogoConfirmacao } = useConfirmacao()
   const [nome, setNome] = useState('')
 
   const { data: categorias, isLoading } = useQuery({
@@ -40,13 +42,11 @@ export function Categorias() {
   const { data: contagem } = useQuery({
     queryKey: ['categorias_produtos_contagem'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('produtos').select('categoria_id')
+      // Agregação no banco: a versão anterior baixava todos os produtos só
+      // para contar quantos havia em cada categoria.
+      const { data, error } = await supabase.rpc('contagem_produtos_por_categoria')
       if (error) throw error
-      const mapa = new Map<string, number>()
-      for (const p of data ?? []) {
-        if (p.categoria_id) mapa.set(p.categoria_id, (mapa.get(p.categoria_id) ?? 0) + 1)
-      }
-      return mapa
+      return (data ?? {}) as Record<string, number>
     },
   })
 
@@ -93,6 +93,7 @@ export function Categorias() {
 
   return (
     <div>
+      {dialogoConfirmacao}
       <PageHeader
         title="Categorias de produtos"
         description="Agrupamento usado no cadastro de produtos e nos relatórios de estoque"
@@ -158,7 +159,7 @@ export function Categorias() {
                   />
                 </TableCell>
                 <TableCell className="text-sm text-muted-foreground">
-                  {contagem?.get(cat.id) ?? 0}
+                  {contagem?.[cat.id] ?? 0}
                 </TableCell>
                 <TableCell>
                   {podeGerenciar && (
@@ -166,7 +167,22 @@ export function Categorias() {
                       variant="ghost"
                       size="icon-sm"
                       title="Remover categoria"
-                      onClick={() => removeMutation.mutate(cat.id)}
+                      onClick={() =>
+                        pedirConfirmacao({
+                          titulo: 'Remover categoria',
+                          destrutivo: true,
+                          rotuloConfirmar: 'Remover',
+                          descricao: (
+                            <>
+                              A categoria <strong>{cat.nome}</strong> será removida
+                              {(contagem?.[cat.id] ?? 0) > 0
+                                ? ` e ${contagem?.[cat.id]} produto(s) ficarão sem categoria.`
+                                : '.'}
+                            </>
+                          ),
+                          aoConfirmar: () => removeMutation.mutateAsync(cat.id),
+                        })
+                      }
                     >
                       <Trash2 className="size-4" />
                     </Button>

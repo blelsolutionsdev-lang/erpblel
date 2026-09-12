@@ -6,7 +6,9 @@ import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 import { z } from 'zod'
 import { PageHeader } from '@/components/PageHeader'
-import { Paginacao, usePaginacao } from '@/components/Paginacao'
+import { Paginacao } from '@/components/Paginacao'
+import { DataTable } from '@/components/DataTable'
+import { CampoMoeda } from '@/components/campos/CampoMoeda'
 import { BaixarTituloDialog, type TituloParaBaixa } from '@/components/financeiro/BaixarTituloDialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -27,10 +29,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Skeleton } from '@/components/ui/skeleton'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { formatCurrency, formatDate } from '@/lib/format'
-import { useDebounce } from '@/hooks/use-debounce'
+import { useBuscaUrl, useFiltrosUrl } from '@/hooks/use-filtros-url'
 import { mensagemErro } from '@/lib/erros'
 import { supabase } from '@/lib/supabase'
 import type { Tables, TablesInsert } from '@/types/database'
@@ -60,18 +60,17 @@ const statusLabel: Record<Tables<'contas_pagar'>['status'], string> = {
 export function ContasPagar() {
   const queryClient = useQueryClient()
   const [open, setOpen] = useState(false)
-  const [busca, setBusca] = useState('')
   const [baixando, setBaixando] = useState<TituloParaBaixa | null>(null)
 
-  const buscaDebounced = useDebounce(busca)
-  const { pagina, setPagina, de, ate } = usePaginacao(buscaDebounced)
+  const { filtros, definir, pagina, setPagina, de, ate } = useFiltrosUrl({ q: '' })
+  const { texto: busca, setTexto: setBusca } = useBuscaUrl(filtros.q, (q) => definir({ q }))
 
   const {
     data: resultado,
     isLoading,
     isFetching,
   } = useQuery({
-    queryKey: ['contas_pagar', buscaDebounced, pagina],
+    queryKey: ['contas_pagar', filtros.q, pagina],
     queryFn: async () => {
       let query = supabase
         .from('contas_pagar')
@@ -79,7 +78,7 @@ export function ContasPagar() {
         .order('data_vencimento')
         .range(de, ate)
 
-      const termo = buscaDebounced.trim()
+      const termo = filtros.q.trim()
       if (termo) {
         query = query.ilike('descricao', `%${termo}%`)
       }
@@ -124,6 +123,7 @@ export function ContasPagar() {
     reset,
     setValue,
     watch,
+    control,
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -227,11 +227,10 @@ export function ContasPagar() {
                   )}
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="valor">Valor</Label>
-                    <Input id="valor" type="number" step="0.01" min={0} {...register('valor')} />
-                    {errors.valor && <p className="text-xs text-destructive">{errors.valor.message}</p>}
+                    <CampoMoeda id="valor" control={control} name="valor" />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="data_vencimento">Vencimento</Label>
@@ -264,90 +263,75 @@ export function ContasPagar() {
         </div>
       </div>
 
-      <div className="rounded-lg border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Fornecedor</TableHead>
-              <TableHead>Descrição</TableHead>
-              <TableHead>Vencimento</TableHead>
-              <TableHead>Valor</TableHead>
-              <TableHead>Em aberto</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="w-40" />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading &&
-              Array.from({ length: 4 }).map((_, i) => (
-                <TableRow key={i}>
-                  <TableCell colSpan={7}>
-                    <Skeleton className="h-6 w-full" />
-                  </TableCell>
-                </TableRow>
-              ))}
-
-            {!isLoading && contas?.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
-                  {buscaDebounced ? 'Nenhum título encontrado para essa busca.' : 'Nenhuma conta a pagar cadastrada ainda.'}
-                </TableCell>
-              </TableRow>
-            )}
-
-            {contas?.map((conta) => (
-              <TableRow key={conta.id}>
-                <TableCell className="font-medium">{conta.fornecedor?.nome ?? '—'}</TableCell>
-                <TableCell>{conta.descricao}</TableCell>
-                <TableCell>{formatDate(conta.data_vencimento)}</TableCell>
-                <TableCell>{formatCurrency(conta.valor)}</TableCell>
-                <TableCell>
-                  {conta.valor_pago > 0 && conta.status !== 'pago' ? (
-                    <span className="text-amber-600">
-                      {formatCurrency(conta.valor - conta.valor_pago)}
-                    </span>
-                  ) : conta.status === 'pago' ? (
-                    <span className="text-muted-foreground">—</span>
-                  ) : (
-                    formatCurrency(conta.valor - conta.valor_pago)
-                  )}
-                </TableCell>
-                <TableCell>
-                  <Badge
-                    variant={
-                      conta.status === 'pago'
-                        ? 'default'
-                        : conta.status === 'atrasado'
-                          ? 'destructive'
-                          : 'secondary'
-                    }
-                  >
-                    {statusLabel[conta.status]}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  {conta.status !== 'pago' && conta.status !== 'cancelado' && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() =>
-                        setBaixando({
-                          id: conta.id,
-                          descricao: conta.descricao,
-                          valor: conta.valor,
-                          valor_pago: conta.valor_pago,
-                        })
-                      }
-                    >
-                      Baixar
-                    </Button>
-                  )}
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+      <DataTable
+        linhas={contas}
+        carregando={isLoading}
+        chave={(conta) => conta.id}
+        vazio={filtros.q ? 'Nenhum título encontrado para essa busca.' : 'Nenhuma conta a pagar cadastrada ainda.'}
+        colunas={[
+          {
+            titulo: 'Descrição',
+            mobile: 'titulo',
+            celula: (conta) => (
+              <div>
+                <div className="font-medium">{conta.descricao}</div>
+                <div className="text-xs text-muted-foreground">
+                  {conta.fornecedor?.nome ?? '—'}
+                  {conta.origem_tipo === 'os' && ' · gerada por OS'}
+                </div>
+              </div>
+            ),
+          },
+          { titulo: 'Vencimento', celula: (conta) => formatDate(conta.data_vencimento) },
+          { titulo: 'Valor', alinhar: 'direita', celula: (conta) => formatCurrency(conta.valor) },
+          {
+            titulo: 'Em aberto',
+            alinhar: 'direita',
+            celula: (conta) =>
+              conta.status === 'pago' ? (
+                <span className="text-muted-foreground">—</span>
+              ) : (
+                <span className={conta.valor_pago > 0 ? 'text-amber-600' : ''}>
+                  {formatCurrency(conta.valor - conta.valor_pago)}
+                </span>
+              ),
+          },
+          {
+            titulo: 'Status',
+            celula: (conta) => (
+              <Badge
+                variant={
+                  conta.status === 'pago'
+                    ? 'default'
+                    : conta.status === 'atrasado'
+                      ? 'destructive'
+                      : 'secondary'
+                }
+              >
+                {statusLabel[conta.status]}
+              </Badge>
+            ),
+          },
+        ]}
+        acoes={(conta) =>
+          conta.status !== 'pago' && conta.status !== 'cancelado' ? (
+            <Button
+              size="xs"
+              variant="outline"
+              onClick={() =>
+                setBaixando({
+                  id: conta.id,
+                  descricao: conta.descricao,
+                  valor: conta.valor,
+                  valor_pago: conta.valor_pago,
+                })
+              }
+            >
+              Baixar
+            </Button>
+          ) : null
+        }
+      />
 
       <Paginacao
         pagina={pagina}

@@ -6,7 +6,9 @@ import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 import { z } from 'zod'
 import { PageHeader } from '@/components/PageHeader'
-import { Paginacao, usePaginacao } from '@/components/Paginacao'
+import { Paginacao } from '@/components/Paginacao'
+import { DataTable } from '@/components/DataTable'
+import { CampoMoeda } from '@/components/campos/CampoMoeda'
 import { KitComposicao } from '@/components/estoque/KitComposicao'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -26,10 +28,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Skeleton } from '@/components/ui/skeleton'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Table, TableBody, TableCell, TableRow } from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
-import { useDebounce } from '@/hooks/use-debounce'
+import { useBuscaUrl, useFiltrosUrl } from '@/hooks/use-filtros-url'
 import { useAuth } from '@/lib/auth'
 import { mensagemErro } from '@/lib/erros'
 import { formatCurrency } from '@/lib/format'
@@ -83,14 +84,12 @@ export function Produtos() {
   const [ajustando, setAjustando] = useState<Produto | null>(null)
   const [novoSaldo, setNovoSaldo] = useState('')
   const [motivoAjuste, setMotivoAjuste] = useState('')
-  const [busca, setBusca] = useState('')
-  const buscaDebounced = useDebounce(busca)
-  const { pagina, setPagina, de, ate } = usePaginacao(buscaDebounced)
+
+  const { filtros, definir, pagina, setPagina, de, ate } = useFiltrosUrl({ q: '' })
+  const { texto: busca, setTexto: setBusca } = useBuscaUrl(filtros.q, (q) => definir({ q }))
 
   const podeGerenciar = hasPermission('estoque.produtos.gerenciar')
 
-  // Saldo comprometido em OS abertas vem da view: sem isso duas OS prometiam a
-  // mesma peça e a segunda quebrava só na hora de concluir.
   const { data: comprometido } = useQuery({
     queryKey: ['produtos-comprometido'],
     queryFn: async () => {
@@ -112,7 +111,7 @@ export function Produtos() {
     isLoading,
     isFetching,
   } = useQuery({
-    queryKey: ['produtos', buscaDebounced, pagina],
+    queryKey: ['produtos', filtros.q, pagina],
     queryFn: async () => {
       let query = supabase
         .from('produtos')
@@ -120,7 +119,7 @@ export function Produtos() {
         .order('nome')
         .range(de, ate)
 
-      const termo = buscaDebounced.trim()
+      const termo = filtros.q.trim()
       if (termo) {
         query = query.or(
           `nome.ilike.%${termo}%,sku.ilike.%${termo}%,codigo_barras.ilike.%${termo}%,ncm.ilike.%${termo}%`,
@@ -159,6 +158,7 @@ export function Produtos() {
     reset,
     setValue,
     watch,
+    control,
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -187,6 +187,13 @@ export function Produtos() {
     }
   }, [editing, reset])
 
+  function invalidarEstoque() {
+    queryClient.invalidateQueries({ queryKey: ['produtos'] })
+    queryClient.invalidateQueries({ queryKey: ['movimentacoes_estoque'] })
+    queryClient.invalidateQueries({ queryKey: ['produtos-comprometido'] })
+    queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+  }
+
   const saveMutation = useMutation({
     mutationFn: async (values: FormValues) => {
       const payload: TablesInsert<'produtos'> = {
@@ -206,9 +213,7 @@ export function Produtos() {
       }
 
       if (editing) {
-        // estoque_atual não entra no update: ele é derivado das movimentações.
-        // Mandar o valor do formulário de volta (que era o comportamento
-        // antigo) desfazia entradas feitas por outra pessoa no meio tempo.
+        // estoque_atual não entra no update: é derivado das movimentações.
         const { error } = await supabase.from('produtos').update(payload).eq('id', editing.id)
         if (error) throw error
         return
@@ -217,8 +222,7 @@ export function Produtos() {
       const { data, error } = await supabase.from('produtos').insert(payload).select('id').single()
       if (error) throw error
 
-      // Estoque inicial vira um lançamento de ajuste, para o saldo sempre ter
-      // rastro em Movimentações.
+      // Estoque inicial vira lançamento de ajuste, para o saldo ter rastro.
       if (values.tipo === 'simples' && values.estoque_inicial > 0) {
         const { error: ajusteErr } = await supabase.rpc('ajustar_estoque', {
           p_produto_id: data.id,
@@ -230,10 +234,7 @@ export function Produtos() {
     },
     onSuccess: () => {
       toast.success(editing ? 'Produto atualizado.' : 'Produto cadastrado.')
-      queryClient.invalidateQueries({ queryKey: ['produtos'] })
-      queryClient.invalidateQueries({ queryKey: ['movimentacoes_estoque'] })
-      queryClient.invalidateQueries({ queryKey: ['produtos-comprometido'] })
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      invalidarEstoque()
       setOpen(false)
       setEditing(null)
     },
@@ -255,10 +256,7 @@ export function Produtos() {
     },
     onSuccess: () => {
       toast.success('Estoque ajustado e registrado em Movimentações.')
-      queryClient.invalidateQueries({ queryKey: ['produtos'] })
-      queryClient.invalidateQueries({ queryKey: ['movimentacoes_estoque'] })
-      queryClient.invalidateQueries({ queryKey: ['produtos-comprometido'] })
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      invalidarEstoque()
       setAjustando(null)
       setNovoSaldo('')
       setMotivoAjuste('')
@@ -273,8 +271,12 @@ export function Produtos() {
         .update({ ativo: !produto.ativo })
         .eq('id', produto.id)
       if (error) throw error
+      return !produto.ativo
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['produtos'] }),
+    onSuccess: (ativo) => {
+      toast.success(ativo ? 'Produto reativado.' : 'Produto desativado.')
+      queryClient.invalidateQueries({ queryKey: ['produtos'] })
+    },
     onError: (error: unknown) => toast.error(mensagemErro(error)),
   })
 
@@ -313,7 +315,7 @@ export function Produtos() {
         }
       />
 
-      <div className="mb-3 flex items-center gap-2">
+      <div className="mb-3">
         <div className="relative w-full max-w-sm">
           <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -321,113 +323,104 @@ export function Produtos() {
             onChange={(e) => setBusca(e.target.value)}
             placeholder="Buscar por nome, SKU, código de barras ou NCM..."
             className="pl-8"
+            aria-label="Buscar produtos"
           />
         </div>
       </div>
 
-      <div className="rounded-lg border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Produto</TableHead>
-              <TableHead>NCM/CEST</TableHead>
-              <TableHead>Estoque</TableHead>
-              <TableHead>Preço de venda</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="w-28" />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading &&
-              Array.from({ length: 4 }).map((_, i) => (
-                <TableRow key={i}>
-                  <TableCell colSpan={6}>
-                    <Skeleton className="h-6 w-full" />
-                  </TableCell>
-                </TableRow>
-              ))}
-
-            {!isLoading && produtos?.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
-                  {buscaDebounced
-                    ? 'Nenhum produto encontrado para essa busca.'
-                    : 'Nenhum produto cadastrado ainda.'}
-                </TableCell>
-              </TableRow>
-            )}
-
-            {produtos?.map((produto) => {
+      <DataTable
+        linhas={produtos}
+        carregando={isLoading}
+        chave={(p) => p.id}
+        vazio={
+          filtros.q ? 'Nenhum produto encontrado para essa busca.' : 'Nenhum produto cadastrado ainda.'
+        }
+        colunas={[
+          {
+            titulo: 'Produto',
+            mobile: 'titulo',
+            celula: (produto) => (
+              <div>
+                <div className="font-medium">{produto.nome}</div>
+                <div className="text-xs text-muted-foreground">
+                  {produto.sku ?? '—'} · {produto.categoria?.nome ?? 'Sem categoria'}
+                </div>
+              </div>
+            ),
+          },
+          {
+            titulo: 'NCM/CEST',
+            celula: (produto) => (
+              <span className="text-sm">
+                {produto.ncm || '—'} / {produto.cest || '—'}
+              </span>
+            ),
+          },
+          {
+            titulo: 'Estoque',
+            celula: (produto) => {
+              if (produto.tipo === 'kit') return <Badge variant="outline">Kit</Badge>
               const abaixoMinimo = produto.estoque_atual < produto.estoque_minimo
               const reservado = comprometido?.get(produto.id) ?? 0
               return (
-                <TableRow key={produto.id}>
-                  <TableCell>
-                    <div className="font-medium">{produto.nome}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {produto.sku ?? '—'} · {produto.categoria?.nome ?? 'Sem categoria'}
+                <div>
+                  <div className="flex items-center justify-end gap-1.5 md:justify-start">
+                    {abaixoMinimo && <AlertTriangle className="size-3.5 text-amber-500" />}
+                    <span className={abaixoMinimo ? 'font-medium text-amber-600' : ''}>
+                      {produto.estoque_atual} {produto.unidade?.sigla ?? ''}
+                    </span>
+                  </div>
+                  {reservado > 0 && (
+                    <div className="text-[11px] text-muted-foreground">
+                      {reservado} em OS aberta · {produto.estoque_atual - reservado} livre
                     </div>
-                  </TableCell>
-                  <TableCell className="text-sm">
-                    {produto.ncm || '—'} / {produto.cest || '—'}
-                  </TableCell>
-                  <TableCell>
-                    {produto.tipo === 'kit' ? (
-                      <Badge variant="outline">Kit</Badge>
-                    ) : (
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          {abaixoMinimo && <AlertTriangle className="size-3.5 text-amber-500" />}
-                          <span className={abaixoMinimo ? 'font-medium text-amber-600' : ''}>
-                            {produto.estoque_atual} {produto.unidade?.sigla ?? ''}
-                          </span>
-                        </div>
-                        {reservado > 0 && (
-                          <div className="text-[11px] text-muted-foreground">
-                            {reservado} em OS aberta · {produto.estoque_atual - reservado} livre
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </TableCell>
-                  <TableCell>{formatCurrency(produto.preco_venda)}</TableCell>
-                  <TableCell>
-                    <Badge
-                      variant={produto.ativo ? 'default' : 'secondary'}
-                      className={podeGerenciar ? 'cursor-pointer' : ''}
-                      onClick={() => podeGerenciar && toggleAtivoMutation.mutate(produto)}
-                    >
-                      {produto.ativo ? 'Ativo' : 'Inativo'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex gap-1">
-                      {podeGerenciar && produto.tipo === 'simples' && (
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          title="Ajustar estoque"
-                          onClick={() => abrirAjuste(produto)}
-                        >
-                          <Scale className="size-4" />
-                        </Button>
-                      )}
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        title={podeGerenciar ? 'Editar' : 'Ver'}
-                        onClick={() => openEdit(produto)}
-                      >
-                        <Pencil className="size-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
+                  )}
+                </div>
               )
-            })}
-          </TableBody>
-        </Table>
-      </div>
+            },
+          },
+          {
+            titulo: 'Preço de venda',
+            alinhar: 'direita',
+            celula: (produto) => formatCurrency(produto.preco_venda),
+          },
+          {
+            titulo: 'Status',
+            celula: (produto) =>
+              podeGerenciar ? (
+                <button
+                  type="button"
+                  onClick={() => toggleAtivoMutation.mutate(produto)}
+                  disabled={toggleAtivoMutation.isPending}
+                  title={produto.ativo ? 'Desativar produto' : 'Reativar produto'}
+                  className="rounded focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                >
+                  <Badge variant={produto.ativo ? 'default' : 'secondary'}>
+                    {produto.ativo ? 'Ativo' : 'Inativo'}
+                  </Badge>
+                </button>
+              ) : (
+                <Badge variant={produto.ativo ? 'default' : 'secondary'}>
+                  {produto.ativo ? 'Ativo' : 'Inativo'}
+                </Badge>
+              ),
+          },
+        ]}
+        acoes={(produto) => (
+          <>
+            {podeGerenciar && produto.tipo === 'simples' && (
+              <Button size="xs" variant="outline" onClick={() => abrirAjuste(produto)}>
+                <Scale className="size-3.5" />
+                Ajustar
+              </Button>
+            )}
+            <Button size="xs" variant="outline" onClick={() => openEdit(produto)}>
+              <Pencil className="size-3.5" />
+              {podeGerenciar ? 'Editar' : 'Ver'}
+            </Button>
+          </>
+        )}
+      />
 
       <Paginacao
         pagina={pagina}
@@ -461,18 +454,18 @@ export function Produtos() {
                 {errors.nome && <p className="text-xs text-destructive">{errors.nome.message}</p>}
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="sku">SKU</Label>
                   <Input id="sku" {...register('sku')} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="codigo_barras">Código de barras</Label>
-                  <Input id="codigo_barras" {...register('codigo_barras')} />
+                  <Input id="codigo_barras" inputMode="numeric" {...register('codigo_barras')} />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label>Categoria</Label>
                   <Select
@@ -481,7 +474,7 @@ export function Produtos() {
                     onValueChange={(v) => setValue('categoria_id', v ?? '')}
                     disabled={!podeGerenciar}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="w-full">
                       <SelectValue placeholder="Sem categoria" />
                     </SelectTrigger>
                     <SelectContent>
@@ -503,7 +496,7 @@ export function Produtos() {
                     onValueChange={(v) => setValue('unidade_id', v ?? '')}
                     disabled={!podeGerenciar}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="w-full">
                       <SelectValue placeholder="Selecione" />
                     </SelectTrigger>
                     <SelectContent>
@@ -525,7 +518,7 @@ export function Produtos() {
                   onValueChange={(v) => setValue('tipo', (v ?? 'simples') as 'simples' | 'kit')}
                   disabled={!podeGerenciar}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="w-full">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -535,36 +528,40 @@ export function Produtos() {
                 </Select>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="ncm">NCM</Label>
-                  <Input id="ncm" maxLength={8} placeholder="00000000" {...register('ncm')} />
+                  <Input id="ncm" inputMode="numeric" maxLength={8} placeholder="00000000" {...register('ncm')} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="cest">CEST</Label>
-                  <Input id="cest" maxLength={7} placeholder="0000000" {...register('cest')} />
+                  <Input id="cest" inputMode="numeric" maxLength={7} placeholder="0000000" {...register('cest')} />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="preco_custo">Preço de custo</Label>
-                  <Input id="preco_custo" type="number" step="0.01" min={0} {...register('preco_custo')} />
+                  <CampoMoeda id="preco_custo" control={control} name="preco_custo" disabled={!podeGerenciar} />
+                  <p className="text-xs text-muted-foreground">
+                    Recalculado automaticamente como custo médio a cada entrada.
+                  </p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="preco_venda">Preço de venda</Label>
-                  <Input id="preco_venda" type="number" step="0.01" min={0} {...register('preco_venda')} />
+                  <CampoMoeda id="preco_venda" control={control} name="preco_venda" disabled={!podeGerenciar} />
                 </div>
               </div>
 
               {tipo === 'simples' && (
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-4 sm:grid-cols-2">
                   {!editing && (
                     <div className="space-y-2">
                       <Label htmlFor="estoque_inicial">Estoque inicial</Label>
                       <Input
                         id="estoque_inicial"
                         type="number"
+                        inputMode="decimal"
                         step="0.001"
                         min={0}
                         {...register('estoque_inicial')}
@@ -579,6 +576,7 @@ export function Produtos() {
                     <Input
                       id="estoque_minimo"
                       type="number"
+                      inputMode="decimal"
                       step="0.001"
                       min={0}
                       {...register('estoque_minimo')}
@@ -591,8 +589,7 @@ export function Produtos() {
                         {editing.estoque_atual} {editing.unidade?.sigla ?? ''}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        Calculado pelas movimentações. Use o botão de ajuste na listagem para
-                        corrigir o saldo.
+                        Calculado pelas movimentações. Use "Ajustar" na listagem para corrigir.
                       </p>
                     </div>
                   )}
@@ -600,8 +597,7 @@ export function Produtos() {
               )}
               {tipo === 'kit' && (
                 <p className="text-xs text-muted-foreground">
-                  Kit não tem estoque próprio — o saldo disponível é calculado a partir dos
-                  componentes.
+                  Kit não tem estoque próprio — o saldo disponível vem dos componentes.
                 </p>
               )}
 
@@ -615,7 +611,7 @@ export function Produtos() {
           {tipo === 'kit' && editing && <KitComposicao kitId={editing.id} editavel={podeGerenciar} />}
           {tipo === 'kit' && !editing && (
             <p className="text-xs text-muted-foreground">
-              Salve o produto primeiro para poder adicionar os componentes do kit.
+              Salve o produto primeiro para adicionar os componentes do kit.
             </p>
           )}
           {podeGerenciar && (
@@ -634,15 +630,26 @@ export function Produtos() {
             <DialogTitle>Ajustar estoque</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              {ajustando?.nome} — saldo atual {ajustando?.estoque_atual}{' '}
-              {ajustando?.unidade?.sigla ?? ''}
-            </p>
+            <Table>
+              <TableBody>
+                <TableRow>
+                  <TableCell className="text-muted-foreground">Produto</TableCell>
+                  <TableCell className="text-right font-medium">{ajustando?.nome}</TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell className="text-muted-foreground">Saldo atual</TableCell>
+                  <TableCell className="text-right">
+                    {ajustando?.estoque_atual} {ajustando?.unidade?.sigla ?? ''}
+                  </TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
             <div className="space-y-2">
               <Label htmlFor="novo_saldo">Novo saldo</Label>
               <Input
                 id="novo_saldo"
                 type="number"
+                inputMode="decimal"
                 step="0.001"
                 min={0}
                 value={novoSaldo}

@@ -93,3 +93,15 @@ export const navGroups: NavGroup[] = [
 ]
 
 export const dashboardItem = { title: 'Dashboard', url: '/', icon: LayoutDashboard }
+
+/** Acha a que grupo/item do menu uma rota pertence — usado no breadcrumb. */
+export function encontrarRota(pathname: string): { grupo?: NavGroup; item?: NavItem } {
+  for (const grupo of navGroups) {
+    for (const item of grupo.items) {
+      if (pathname === item.url || pathname.startsWith(`${item.url}/`)) {
+        return { grupo, item }
+      }
+    }
+  }
+  return {}
+}

@@ -1,8 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
 import { ArrowDownLeft, ArrowUpRight, Search, SlidersHorizontal } from 'lucide-react'
-import { useState } from 'react'
 import { PageHeader } from '@/components/PageHeader'
-import { Paginacao, usePaginacao } from '@/components/Paginacao'
+import { Paginacao } from '@/components/Paginacao'
+import { DataTable } from '@/components/DataTable'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import {
@@ -12,9 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Skeleton } from '@/components/ui/skeleton'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { useDebounce } from '@/hooks/use-debounce'
+import { useBuscaUrl, useFiltrosUrl } from '@/hooks/use-filtros-url'
 import { formatCurrency, formatDateTime } from '@/lib/format'
 import { supabase } from '@/lib/supabase'
 import type { Enums, Tables } from '@/types/database'
@@ -43,19 +41,18 @@ const origemLabel: Record<string, string> = {
 }
 
 export function Movimentacoes() {
-  const [busca, setBusca] = useState('')
-  const [tipo, setTipo] = useState<'' | TipoMov>('')
-  const buscaDebounced = useDebounce(busca)
-  const { pagina, setPagina, de, ate } = usePaginacao(`${buscaDebounced}|${tipo}`)
+  const { filtros, definir, pagina, setPagina, de, ate } = useFiltrosUrl({ q: '', tipo: '' })
+  const { texto: busca, setTexto: setBusca } = useBuscaUrl(filtros.q, (q) => definir({ q }))
+  const tipo = filtros.tipo as '' | TipoMov
 
   const {
     data: resultado,
     isLoading,
     isFetching,
   } = useQuery({
-    queryKey: ['movimentacoes_estoque', buscaDebounced, tipo, pagina],
+    queryKey: ['movimentacoes_estoque', filtros.q, tipo, pagina],
     queryFn: async () => {
-      const termo = buscaDebounced.trim()
+      const termo = filtros.q.trim()
 
       let query = supabase
         .from('movimentacoes_estoque')
@@ -102,7 +99,7 @@ export function Movimentacoes() {
             ...(Object.keys(tipoLabel) as TipoMov[]).map((t) => ({ value: t, label: tipoLabel[t] })),
           ]}
           value={tipo || 'todos'}
-          onValueChange={(v) => setTipo(!v || v === 'todos' ? '' : (v as TipoMov))}
+          onValueChange={(v) => definir({ tipo: !v || v === 'todos' ? '' : v })}
         >
           <SelectTrigger className="w-52">
             <SlidersHorizontal className="size-3.5 text-muted-foreground" />
@@ -119,79 +116,62 @@ export function Movimentacoes() {
         </Select>
       </div>
 
-      <div className="rounded-lg border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Data</TableHead>
-              <TableHead>Produto</TableHead>
-              <TableHead>Tipo</TableHead>
-              <TableHead className="text-right">Quantidade</TableHead>
-              <TableHead>Custo unit.</TableHead>
-              <TableHead>Origem</TableHead>
-              <TableHead>Responsável</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading &&
-              Array.from({ length: 6 }).map((_, i) => (
-                <TableRow key={i}>
-                  <TableCell colSpan={7}>
-                    <Skeleton className="h-6 w-full" />
-                  </TableCell>
-                </TableRow>
-              ))}
-
-            {!isLoading && movimentacoes?.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
-                  Nenhuma movimentação encontrada.
-                </TableCell>
-              </TableRow>
-            )}
-
-            {movimentacoes?.map((mov) => {
+      <DataTable
+        linhas={movimentacoes}
+        carregando={isLoading}
+        chave={(mov) => mov.id}
+        vazio="Nenhuma movimentação encontrada."
+        colunas={[
+          {
+            titulo: 'Produto',
+            mobile: 'titulo',
+            celula: (mov) => (
+              <div>
+                <div className="font-medium">{mov.produto?.nome ?? '—'}</div>
+                {mov.observacao && (
+                  <div className="text-xs text-muted-foreground">{mov.observacao}</div>
+                )}
+              </div>
+            ),
+          },
+          { titulo: 'Data', celula: (mov) => formatDateTime(mov.created_at) },
+          {
+            titulo: 'Tipo',
+            celula: (mov) => {
               const entrada = mov.tipo === 'entrada' || (mov.tipo === 'ajuste' && mov.quantidade >= 0)
               return (
-                <TableRow key={mov.id}>
-                  <TableCell className="whitespace-nowrap text-sm">
-                    {formatDateTime(mov.created_at)}
-                  </TableCell>
-                  <TableCell>
-                    <div className="font-medium">{mov.produto?.nome ?? '—'}</div>
-                    {mov.observacao && (
-                      <div className="text-xs text-muted-foreground">{mov.observacao}</div>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={entrada ? 'default' : 'secondary'} className="gap-1">
-                      {entrada ? (
-                        <ArrowDownLeft className="size-3" />
-                      ) : (
-                        <ArrowUpRight className="size-3" />
-                      )}
-                      {tipoLabel[mov.tipo]}
-                    </Badge>
-                  </TableCell>
-                  <TableCell
-                    className={`text-right font-medium ${entrada ? 'text-emerald-600' : 'text-amber-600'}`}
-                  >
-                    {entrada ? '+' : '−'}
-                    {Math.abs(mov.quantidade)}
-                  </TableCell>
-                  <TableCell>
-                    {mov.preco_unitario != null ? formatCurrency(mov.preco_unitario) : '—'}
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {mov.origem_tipo ? (origemLabel[mov.origem_tipo] ?? mov.origem_tipo) : '—'}
-                  </TableCell>
-                  <TableCell className="text-sm">{mov.autor?.nome ?? '—'}</TableCell>
-                </TableRow>
+                <Badge variant={entrada ? 'default' : 'secondary'} className="gap-1">
+                  {entrada ? <ArrowDownLeft className="size-3" /> : <ArrowUpRight className="size-3" />}
+                  {tipoLabel[mov.tipo]}
+                </Badge>
               )
-            })}
-          </TableBody>
-        </Table>
-      </div>
+            },
+          },
+          {
+            titulo: 'Quantidade',
+            alinhar: 'direita',
+            celula: (mov) => {
+              const entrada = mov.tipo === 'entrada' || (mov.tipo === 'ajuste' && mov.quantidade >= 0)
+              return (
+                <span className={`font-medium ${entrada ? 'text-emerald-600' : 'text-amber-600'}`}>
+                  {entrada ? '+' : '−'}
+                  {Math.abs(mov.quantidade)}
+                </span>
+              )
+            },
+          },
+          {
+            titulo: 'Custo unit.',
+            alinhar: 'direita',
+            celula: (mov) => (mov.preco_unitario != null ? formatCurrency(mov.preco_unitario) : '—'),
+          },
+          {
+            titulo: 'Origem',
+            celula: (mov) => (mov.origem_tipo ? (origemLabel[mov.origem_tipo] ?? mov.origem_tipo) : '—'),
+          },
+          { titulo: 'Responsável', celula: (mov) => mov.autor?.nome ?? '—' },
+        ]}
+      />
 
       <Paginacao
         pagina={pagina}

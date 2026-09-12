@@ -13,6 +13,7 @@ import {
   Layers,
   LayoutDashboard,
   Package,
+  ScanLine,
   Receipt,
   ReceiptText,
   ShoppingCart,
@@ -55,6 +56,7 @@ export const navGroups: NavGroup[] = [
       { title: 'Estoque mínimo', url: '/estoque/minimos', icon: Gauge },
       { title: 'Necessidade de materiais', url: '/estoque/necessidade', icon: Layers },
       { title: 'Movimentações', url: '/estoque/movimentacoes', icon: ArrowLeftRight },
+      { title: 'Rastreio', url: '/estoque/rastreio', icon: ScanLine },
       {
         title: 'Entrada de NF-e',
         url: '/estoque/entradas',

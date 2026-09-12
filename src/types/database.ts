@@ -708,12 +708,84 @@ export type Database = {
         }
         Relationships: []
       }
+      lotes: {
+        Row: {
+          codigo: string
+          created_at: string
+          created_by: string | null
+          fabricacao: string | null
+          fornecedor_id: string | null
+          id: string
+          observacao: string | null
+          origem_id: string | null
+          origem_tipo: string | null
+          produto_id: string
+          validade: string | null
+        }
+        Insert: {
+          codigo: string
+          created_at?: string
+          created_by?: string | null
+          fabricacao?: string | null
+          fornecedor_id?: string | null
+          id?: string
+          observacao?: string | null
+          origem_id?: string | null
+          origem_tipo?: string | null
+          produto_id: string
+          validade?: string | null
+        }
+        Update: {
+          codigo?: string
+          created_at?: string
+          created_by?: string | null
+          fabricacao?: string | null
+          fornecedor_id?: string | null
+          id?: string
+          observacao?: string | null
+          origem_id?: string | null
+          origem_tipo?: string | null
+          produto_id?: string
+          validade?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lotes_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lotes_fornecedor_id_fkey"
+            columns: ["fornecedor_id"]
+            isOneToOne: false
+            referencedRelation: "fornecedores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lotes_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lotes_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_produtos_estoque"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       movimentacoes_estoque: {
         Row: {
           created_at: string
           created_by: string | null
           ficha_tecnica_id: string | null
           id: string
+          lote_id: string | null
           observacao: string | null
           origem_id: string | null
           origem_tipo: string | null
@@ -727,6 +799,7 @@ export type Database = {
           created_by?: string | null
           ficha_tecnica_id?: string | null
           id?: string
+          lote_id?: string | null
           observacao?: string | null
           origem_id?: string | null
           origem_tipo?: string | null
@@ -740,6 +813,7 @@ export type Database = {
           created_by?: string | null
           ficha_tecnica_id?: string | null
           id?: string
+          lote_id?: string | null
           observacao?: string | null
           origem_id?: string | null
           origem_tipo?: string | null
@@ -762,6 +836,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "fichas_tecnicas"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "movimentacoes_estoque_lote_id_fkey"
+            columns: ["lote_id"]
+            isOneToOne: false
+            referencedRelation: "lotes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "movimentacoes_estoque_lote_id_fkey"
+            columns: ["lote_id"]
+            isOneToOne: false
+            referencedRelation: "vw_saldo_lotes"
+            referencedColumns: ["lote_id"]
           },
           {
             foreignKeyName: "movimentacoes_estoque_produto_id_fkey"
@@ -968,6 +1056,150 @@ export type Database = {
             columns: ["os_id"]
             isOneToOne: false
             referencedRelation: "ordens_servico"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      numeros_serie: {
+        Row: {
+          cliente_id: string | null
+          created_at: string
+          created_by: string | null
+          equipamento_id: string | null
+          fabricacao: string | null
+          fornecedor_id: string | null
+          garantia_ate: string | null
+          id: string
+          lote_id: string | null
+          movimentacao_entrada_id: string | null
+          movimentacao_saida_id: string | null
+          observacao: string | null
+          origem_id: string | null
+          origem_tipo: string | null
+          os_id: string | null
+          produto_id: string
+          serie: string
+          status: Database["public"]["Enums"]["serie_status"]
+          updated_at: string
+        }
+        Insert: {
+          cliente_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          equipamento_id?: string | null
+          fabricacao?: string | null
+          fornecedor_id?: string | null
+          garantia_ate?: string | null
+          id?: string
+          lote_id?: string | null
+          movimentacao_entrada_id?: string | null
+          movimentacao_saida_id?: string | null
+          observacao?: string | null
+          origem_id?: string | null
+          origem_tipo?: string | null
+          os_id?: string | null
+          produto_id: string
+          serie: string
+          status?: Database["public"]["Enums"]["serie_status"]
+          updated_at?: string
+        }
+        Update: {
+          cliente_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          equipamento_id?: string | null
+          fabricacao?: string | null
+          fornecedor_id?: string | null
+          garantia_ate?: string | null
+          id?: string
+          lote_id?: string | null
+          movimentacao_entrada_id?: string | null
+          movimentacao_saida_id?: string | null
+          observacao?: string | null
+          origem_id?: string | null
+          origem_tipo?: string | null
+          os_id?: string | null
+          produto_id?: string
+          serie?: string
+          status?: Database["public"]["Enums"]["serie_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "numeros_serie_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "numeros_serie_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "numeros_serie_equipamento_id_fkey"
+            columns: ["equipamento_id"]
+            isOneToOne: false
+            referencedRelation: "equipamentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "numeros_serie_fornecedor_id_fkey"
+            columns: ["fornecedor_id"]
+            isOneToOne: false
+            referencedRelation: "fornecedores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "numeros_serie_lote_id_fkey"
+            columns: ["lote_id"]
+            isOneToOne: false
+            referencedRelation: "lotes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "numeros_serie_lote_id_fkey"
+            columns: ["lote_id"]
+            isOneToOne: false
+            referencedRelation: "vw_saldo_lotes"
+            referencedColumns: ["lote_id"]
+          },
+          {
+            foreignKeyName: "numeros_serie_movimentacao_entrada_id_fkey"
+            columns: ["movimentacao_entrada_id"]
+            isOneToOne: false
+            referencedRelation: "movimentacoes_estoque"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "numeros_serie_movimentacao_saida_id_fkey"
+            columns: ["movimentacao_saida_id"]
+            isOneToOne: false
+            referencedRelation: "movimentacoes_estoque"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "numeros_serie_os_id_fkey"
+            columns: ["os_id"]
+            isOneToOne: false
+            referencedRelation: "ordens_servico"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "numeros_serie_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "numeros_serie_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_produtos_estoque"
             referencedColumns: ["id"]
           },
         ]
@@ -1306,6 +1538,7 @@ export type Database = {
           categoria_id: string | null
           cest: string | null
           codigo_barras: string | null
+          controle: Database["public"]["Enums"]["controle_rastreio"]
           created_at: string
           descricao: string | null
           estoque_atual: number
@@ -1329,6 +1562,7 @@ export type Database = {
           categoria_id?: string | null
           cest?: string | null
           codigo_barras?: string | null
+          controle?: Database["public"]["Enums"]["controle_rastreio"]
           created_at?: string
           descricao?: string | null
           estoque_atual?: number
@@ -1352,6 +1586,7 @@ export type Database = {
           categoria_id?: string | null
           cest?: string | null
           codigo_barras?: string | null
+          controle?: Database["public"]["Enums"]["controle_rastreio"]
           created_at?: string
           descricao?: string | null
           estoque_atual?: number
@@ -1677,6 +1912,43 @@ export type Database = {
         }
         Relationships: []
       }
+      vw_saldo_lotes: {
+        Row: {
+          codigo: string | null
+          created_at: string | null
+          fabricacao: string | null
+          fornecedor_id: string | null
+          lote_id: string | null
+          origem_id: string | null
+          origem_tipo: string | null
+          produto_id: string | null
+          saldo: number | null
+          validade: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lotes_fornecedor_id_fkey"
+            columns: ["fornecedor_id"]
+            isOneToOne: false
+            referencedRelation: "fornecedores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lotes_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lotes_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_produtos_estoque"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       abrir_sub_os_garantia: {
@@ -1748,6 +2020,8 @@ export type Database = {
         Returns: Json
       }
       preparar_nfce_os: { Args: { p_os_id: string }; Returns: Json }
+      rastrear_lote: { Args: { p_lote_id: string }; Returns: Json }
+      rastrear_serie: { Args: { p_serie_id: string }; Returns: Json }
       registrar_entrada_nfe: { Args: { p_payload: Json }; Returns: Json }
       registrar_retorno_nfce: {
         Args: {
@@ -1786,6 +2060,7 @@ export type Database = {
     Enums: {
       ambiente_fiscal: "homologacao" | "producao"
       caixa_movimento_tipo: "entrada" | "saida"
+      controle_rastreio: "nenhum" | "lote" | "serie"
       ficha_status: "rascunho" | "ativa" | "encerrada"
       financeiro_categoria_tipo: "receita" | "despesa"
       movimento_estoque_tipo: "entrada" | "saida" | "ajuste" | "transferencia"
@@ -1809,6 +2084,12 @@ export type Database = {
         | "reprovada"
       pessoa_tipo: "PF" | "PJ"
       produto_tipo: "simples" | "kit"
+      serie_status:
+        | "em_estoque"
+        | "reservado"
+        | "vendido"
+        | "em_assistencia"
+        | "baixado"
       solicitacao_compra_status:
         | "aberta"
         | "aprovada"
@@ -1945,6 +2226,7 @@ export const Constants = {
     Enums: {
       ambiente_fiscal: ["homologacao", "producao"],
       caixa_movimento_tipo: ["entrada", "saida"],
+      controle_rastreio: ["nenhum", "lote", "serie"],
       ficha_status: ["rascunho", "ativa", "encerrada"],
       financeiro_categoria_tipo: ["receita", "despesa"],
       movimento_estoque_tipo: ["entrada", "saida", "ajuste", "transferencia"],
@@ -1964,6 +2246,13 @@ export const Constants = {
       ],
       pessoa_tipo: ["PF", "PJ"],
       produto_tipo: ["simples", "kit"],
+      serie_status: [
+        "em_estoque",
+        "reservado",
+        "vendido",
+        "em_assistencia",
+        "baixado",
+      ],
       solicitacao_compra_status: [
         "aberta",
         "aprovada",

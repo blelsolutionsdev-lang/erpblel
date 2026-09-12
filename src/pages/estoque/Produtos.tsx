@@ -50,6 +50,7 @@ const formSchema = z.object({
   categoria_id: z.string().optional(),
   unidade_id: z.string().optional(),
   tipo: z.enum(['simples', 'kit']),
+  controle: z.enum(['nenhum', 'lote', 'serie']),
   ncm: z.string().optional(),
   cest: z.string().optional(),
   preco_custo: z.coerce.number().min(0),
@@ -68,6 +69,7 @@ const emptyValues: FormValues = {
   categoria_id: '',
   unidade_id: '',
   tipo: 'simples',
+  controle: 'nenhum',
   ncm: '',
   cest: '',
   preco_custo: 0,
@@ -175,6 +177,7 @@ export function Produtos() {
         categoria_id: editing.categoria_id ?? '',
         unidade_id: editing.unidade_id ?? '',
         tipo: editing.tipo,
+        controle: editing.controle,
         ncm: editing.ncm ?? '',
         cest: editing.cest ?? '',
         preco_custo: editing.preco_custo,
@@ -204,6 +207,8 @@ export function Produtos() {
         categoria_id: values.categoria_id || null,
         unidade_id: values.unidade_id || null,
         tipo: values.tipo,
+        // Kit não movimenta saldo próprio: quem carrega lote/série é o componente.
+        controle: values.tipo === 'kit' ? 'nenhum' : values.controle,
         ncm: values.ncm || null,
         cest: values.cest || null,
         preco_custo: values.preco_custo,
@@ -223,7 +228,7 @@ export function Produtos() {
       if (error) throw error
 
       // Estoque inicial vira lançamento de ajuste, para o saldo ter rastro.
-      if (values.tipo === 'simples' && values.estoque_inicial > 0) {
+      if (values.tipo === 'simples' && values.controle === 'nenhum' && values.estoque_inicial > 0) {
         const { error: ajusteErr } = await supabase.rpc('ajustar_estoque', {
           p_produto_id: data.id,
           p_novo_saldo: values.estoque_inicial,
@@ -297,6 +302,7 @@ export function Produtos() {
   }
 
   const tipo = watch('tipo')
+  const controle = watch('controle')
   const categoriaId = watch('categoria_id')
   const unidadeId = watch('unidade_id')
 
@@ -528,6 +534,43 @@ export function Produtos() {
                 </Select>
               </div>
 
+              {tipo === 'simples' && (
+                <div className="space-y-2">
+                  <Label>Rastreio</Label>
+                  <Select
+                    items={{ nenhum: 'Sem rastreio', lote: 'Por lote', serie: 'Por número de série' }}
+                    value={controle}
+                    onValueChange={(v) =>
+                      setValue('controle', (v ?? 'nenhum') as 'nenhum' | 'lote' | 'serie')
+                    }
+                    disabled={!podeGerenciar || (!!editing && editing.estoque_atual > 0)}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="nenhum">Sem rastreio</SelectItem>
+                      <SelectItem value="lote">Por lote</SelectItem>
+                      <SelectItem value="serie">Por número de série</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    {controle === 'lote' &&
+                      'Cada entrada exige um lote; a saída consome primeiro o que vence antes. A entrada de NF-e abre o lote da própria nota.'}
+                    {controle === 'serie' &&
+                      'Uma unidade por número. A entrada de NF-e exige os números de série do item.'}
+                    {controle === 'nenhum' &&
+                      'Só a quantidade é controlada — suficiente para parafuso, conexão e afins.'}
+                    {!!editing && editing.estoque_atual > 0 && (
+                      <>
+                        {' '}
+                        Só dá para mudar com saldo zerado: o que já entrou não teria lote nem série.
+                      </>
+                    )}
+                  </p>
+                </div>
+              )}
+
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="ncm">NCM</Label>
@@ -555,7 +598,10 @@ export function Produtos() {
 
               {tipo === 'simples' && (
                 <div className="grid gap-4 sm:grid-cols-2">
-                  {!editing && (
+                  {/* Estoque inicial vira um ajuste, e ajuste sem lote/série é
+                      recusado pelo banco em produto rastreado — a entrada tem
+                      que vir pela NF-e, que é quem sabe o lote e as séries. */}
+                  {!editing && controle === 'nenhum' && (
                     <div className="space-y-2">
                       <Label htmlFor="estoque_inicial">Estoque inicial</Label>
                       <Input

@@ -78,6 +78,11 @@ Schema versionado em `supabase/migrations/`:
 | `20260912190100_rpc_necessidade_de_materiais.sql` | `necessidade_de_materiais`: necessário × disponível × faltante |
 | `20260912190200_solicitacao_compra.sql` | `solicitacoes_compra` e a permissão `compras.solicitar` |
 | `20260912190300_rpcs_solicitacao_de_faltantes.sql` | `gerar_solicitacao_de_faltantes` e `cancelar_solicitacao_compra` |
+| `20260912191000_renomeia_explodir_kit.sql` | rename da RPC (com guarda para banco novo) |
+| `20260912200000_rastreabilidade_lote_e_serie.sql` | **lote e série**: `lotes`, `numeros_serie`, `produtos.controle` |
+| `20260912200100_saldo_por_lote_e_alocacao_fefo.sql` | `vw_saldo_lotes` e a alocação FEFO na saída |
+| `20260912200200_nfe_cria_lote_e_serie.sql` | a entrada de NF-e abre o lote da nota e grava as séries |
+| `20260912200300_rpcs_rastreio.sql` | `rastrear_lote` e `rastrear_serie` |
 
 Para aplicar num projeto novo: `supabase db push`. No projeto que já estava no
 ar, essas versões foram registradas como aplicadas no histórico do Supabase, e
@@ -138,6 +143,28 @@ Chaves: `administrativo.clientes.gerenciar`,
   travam as duas versões juntas.
 - `produto_kit_itens` está **obsoleta** — mantida só como registro do que havia
   antes de existir versionamento.
+
+#### Rastreio (lote e série)
+
+- O rastreio é **por produto**: `produtos.controle` ∈ {`nenhum`, `lote`, `serie`}.
+  O default `nenhum` mantém o comportamento de sempre — parafuso não precisa de
+  lote, aquecedor precisa de série.
+- **Entrada de produto com lote exige lote.** A entrada de NF-e abre sozinha o
+  lote da própria nota (`NF <numero>/<serie>`), com fornecedor e validade — sem
+  isso, marcar um produto como controlado quebraria a única porta de entrada de
+  estoque que existe hoje.
+- **Saída aloca por FEFO**: sai primeiro o que vence antes; sem validade, o lote
+  mais antigo. A alocação roda num gatilho `BEFORE INSERT` de propósito — a
+  saída pode ser repartida entre lotes, e repartir depois do insert deixaria no
+  razão uma linha-pai somada às filhas, contando o mesmo produto duas vezes.
+- **Entrada de produto com série exige as séries no item.** Inventar número de
+  série seria pior do que recusar.
+- Saldo por lote (`vw_saldo_lotes`) é derivado do razão, como o saldo do produto.
+- `rastrear_lote` e `rastrear_serie` respondem de onde veio e para onde foi. O
+  histórico de status da série sai da `auditoria`, que já grava antes e depois.
+- A janela de "perto de vencer" vive em `src/lib/rastreio.ts` com testes: ela vai
+  reaparecer no alerta de vencimento e no relatório de estoque parado, e três
+  lugares decidindo isso sozinhos dariam três respostas.
 
 #### Necessidade de materiais e reserva
 

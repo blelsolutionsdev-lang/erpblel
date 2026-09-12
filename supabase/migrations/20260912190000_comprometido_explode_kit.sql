@@ -46,5 +46,10 @@ select p.id,
   from public.produtos p
   left join comprometido c on c.produto_id = p.id;
 
+-- `create or replace view` não preserva as opções da view: sem isto ela volta
+-- ao padrão do Postgres (security definer) e passa a ler ignorando a RLS de
+-- quem consulta.
+alter view public.vw_produtos_estoque set (security_invoker = true);
+
 comment on view public.vw_produtos_estoque is
   'Saldo por produto com a reserva das OS abertas já explodida pela ficha técnica em vigor (inclusive submontados).';

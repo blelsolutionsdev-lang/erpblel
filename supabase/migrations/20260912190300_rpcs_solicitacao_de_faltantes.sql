@@ -9,7 +9,7 @@ create or replace function public.gerar_solicitacao_de_faltantes(
   p_observacao text default null
 ) returns jsonb language plpgsql security definer set search_path to 'public' as $function$
 declare
-  v_explosao jsonb;
+  v_necessidade jsonb;
   v_solicitacao_id uuid;
   v_numero bigint;
   v_itens int;
@@ -18,18 +18,18 @@ begin
     raise exception 'Você não tem permissão para abrir solicitações de compra.' using errcode = '42501';
   end if;
 
-  v_explosao := public.explodir_kit(p_produto_id, p_quantidade);
+  v_necessidade := public.necessidade_de_materiais(p_produto_id, p_quantidade);
 
-  if (v_explosao->>'itens_faltando')::int = 0 then
+  if (v_necessidade->>'itens_faltando')::int = 0 then
     raise exception 'Nada a comprar: o estoque disponível cobre essa produção.' using errcode = '22023';
   end if;
 
   insert into public.solicitacoes_compra
     (origem_tipo, origem_id, origem_descricao, observacao, solicitada_por)
   values
-    ('explosao_kit', p_produto_id,
+    ('necessidade_materiais', p_produto_id,
      'Produzir ' || trim(to_char(p_quantidade, 'FM999999990.####')) || ' × ' ||
-       (v_explosao->>'produto_nome') || ' (ficha v' || (v_explosao->>'ficha_versao') || ')',
+       (v_necessidade->>'produto_nome') || ' (ficha v' || (v_necessidade->>'ficha_versao') || ')',
      nullif(p_observacao, ''), auth.uid())
   returning id, numero into v_solicitacao_id, v_numero;
 
@@ -43,7 +43,7 @@ begin
          ', disponível ' || trim(to_char((c->>'disponivel')::numeric, 'FM999999990.####')) ||
          coalesce(' (' || nullif(trim(to_char((c->>'comprometido')::numeric, 'FM999999990.####')), '0')
                   || ' já reservado em OS aberta)', '')
-    from jsonb_array_elements(v_explosao->'componentes') c
+    from jsonb_array_elements(v_necessidade->'componentes') c
    where (c->>'faltante')::numeric > 0;
 
   get diagnostics v_itens = row_count;

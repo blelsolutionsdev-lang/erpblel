@@ -75,7 +75,7 @@ Schema versionado em `supabase/migrations/`:
 | `20260912182038_ficha_tecnica_rpcs_versao_e_ativacao.sql` | `criar_versao_ficha` e `ativar_ficha_tecnica` |
 | `20260912182050_cascata_estoque_usa_ficha_vigente.sql` | a baixa em cascata passa a ler a ficha em vigor |
 | `20260912190000_comprometido_explode_kit.sql` | a reserva das OS abertas desce pela ficha até os componentes |
-| `20260912190100_rpc_explodir_kit.sql` | `explodir_kit`: necessário × disponível × faltante |
+| `20260912190100_rpc_necessidade_de_materiais.sql` | `necessidade_de_materiais`: necessário × disponível × faltante |
 | `20260912190200_solicitacao_compra.sql` | `solicitacoes_compra` e a permissão `compras.solicitar` |
 | `20260912190300_rpcs_solicitacao_de_faltantes.sql` | `gerar_solicitacao_de_faltantes` e `cancelar_solicitacao_compra` |
 
@@ -139,9 +139,9 @@ Chaves: `administrativo.clientes.gerenciar`,
 - `produto_kit_itens` está **obsoleta** — mantida só como registro do que havia
   antes de existir versionamento.
 
-#### Explosão de kit e reserva
+#### Necessidade de materiais e reserva
 
-- `explodir_kit(produto, quantidade)` desce pela ficha em vigor (multinível, com
+- `necessidade_de_materiais(produto, quantidade)` desce pela ficha em vigor (com
   perda) e agrega nos componentes reais: submontado é etapa de montagem, não
   linha de compra. Recusa explodir se algum submontado estiver sem ficha em
   vigor, porque a necessidade sairia subestimada.
@@ -149,7 +149,7 @@ Chaves: `administrativo.clientes.gerenciar`,
   kit reserva os componentes, não só o kit (que não tem saldo próprio).
 - O faltante é calculado sobre o **disponível**, não sobre o saldo físico —
   comprar contra o saldo físico é o jeito de prometer a mesma peça duas vezes.
-- `gerar_solicitacao_de_faltantes` **recalcula a explosão no servidor**: entre a
+- `gerar_solicitacao_de_faltantes` **refaz a conta no servidor**: entre a
   tela mostrar o resultado e a pessoa clicar, uma OS pode ter reservado o saldo.
 - A mesma aritmética está em `src/lib/ficha.ts` (`necessidadeDe`, `faltanteDe`),
   com testes que travam o exemplo do cadastro junto com a versão SQL.

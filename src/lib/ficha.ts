@@ -29,7 +29,8 @@ export function custoFicha(linhas: LinhaFicha[]) {
 
 /**
  * Necessidade de um componente para produzir `quantidadeProduzida` do pai.
- * Espelha a recursão de `explodir_kit()`: quantidade da ficha × perda × produção.
+ * Espelha a recursão de `necessidade_de_materiais()`: quantidade da ficha ×
+ * perda × produção.
  */
 export function necessidadeDe(
   quantidadeProduzida: number,

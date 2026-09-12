@@ -32,7 +32,7 @@ type Componente = {
   custo_total: number
 }
 
-type Explosao = {
+type Necessidade = {
   produto_nome: string
   quantidade: number
   ficha_versao: number
@@ -51,10 +51,11 @@ function numero(valor: number) {
  * "Produzir 10 unidades do Kit Aquecedor X" — o que é preciso, o que existe, o
  * que já está prometido para outra OS e o que falta comprar.
  *
- * A conta roda no banco (`explodir_kit`), desce pela ficha em vigor e agrega
- * nos componentes reais: submontado é etapa de montagem, não linha de compra.
+ * A conta roda no banco (`necessidade_de_materiais`), desce pela ficha em vigor
+ * e agrega nos componentes reais: submontado é etapa de montagem, não linha de
+ * compra.
  */
-export function ExplosaoKit() {
+export function NecessidadeMateriais() {
   const navigate = useNavigate()
   const { hasPermission } = useAuth()
   const podeSolicitar = hasPermission('compras.solicitar')
@@ -63,20 +64,20 @@ export function ExplosaoKit() {
   const quantidadeValida = Number.isFinite(quantidade) && quantidade > 0
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['explosao-kit', filtros.kit, filtros.qtd],
+    queryKey: ['necessidade-materiais', filtros.kit, filtros.qtd],
     enabled: !!filtros.kit && quantidadeValida,
     queryFn: async () => {
-      const { data, error } = await supabase.rpc('explodir_kit', {
+      const { data, error } = await supabase.rpc('necessidade_de_materiais', {
         p_produto_id: filtros.kit,
         p_quantidade: quantidade,
       })
       if (error) throw error
-      return data as unknown as Explosao
+      return data as unknown as Necessidade
     },
   })
 
-  // A RPC recalcula a explosão no servidor: entre ver a tela e clicar, uma OS
-  // pode ter reservado o saldo.
+  // A RPC refaz a conta no servidor: entre ver a tela e clicar, uma OS pode
+  // ter reservado o saldo.
   const solicitarMutation = useMutation({
     mutationFn: async () => {
       const { data, error } = await supabase.rpc('gerar_solicitacao_de_faltantes', {
@@ -99,7 +100,7 @@ export function ExplosaoKit() {
   return (
     <div>
       <PageHeader
-        title="Explosão de kit"
+        title="Necessidade de materiais"
         description="Quanto de cada componente uma produção consome, contra o que está disponível de verdade — já descontando o que outras OS abertas reservaram."
       />
 

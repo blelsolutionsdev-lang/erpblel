@@ -53,7 +53,7 @@ export const navGroups: NavGroup[] = [
       { title: 'Produtos', url: '/estoque/produtos', icon: Package },
       { title: 'Categorias', url: '/estoque/categorias', icon: Tags },
       { title: 'Estoque mínimo', url: '/estoque/minimos', icon: Gauge },
-      { title: 'Explosão de kit', url: '/estoque/explosao', icon: Layers },
+      { title: 'Necessidade de materiais', url: '/estoque/necessidade', icon: Layers },
       { title: 'Movimentações', url: '/estoque/movimentacoes', icon: ArrowLeftRight },
       {
         title: 'Entrada de NF-e',

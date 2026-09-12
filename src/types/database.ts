@@ -1734,10 +1734,6 @@ export type Database = {
       }
       definir_estoque_minimo: { Args: { p_itens: Json }; Returns: number }
       enviar_orcamento_os: { Args: { p_os_id: string }; Returns: undefined }
-      explodir_kit: {
-        Args: { p_produto_id: string; p_quantidade?: number }
-        Returns: Json
-      }
       gerar_solicitacao_de_faltantes: {
         Args: {
           p_observacao?: string
@@ -1747,6 +1743,10 @@ export type Database = {
         Returns: Json
       }
       marcar_titulos_atrasados: { Args: never; Returns: Json }
+      necessidade_de_materiais: {
+        Args: { p_produto_id: string; p_quantidade?: number }
+        Returns: Json
+      }
       preparar_nfce_os: { Args: { p_os_id: string }; Returns: Json }
       registrar_entrada_nfe: { Args: { p_payload: Json }; Returns: Json }
       registrar_retorno_nfce: {

@@ -84,7 +84,7 @@ export function SolicitacoesCompra() {
       {dialogoConfirmacao}
       <PageHeader
         title="Solicitações de compra"
-        description="O que precisa ser comprado. Abertas a partir da explosão de kit, com a falta recalculada no momento em que a solicitação foi gerada."
+        description="O que precisa ser comprado. Abertas a partir da necessidade de materiais, com a falta recalculada no momento em que a solicitação foi gerada."
       />
 
       {isLoading && <Skeleton className="h-32 w-full" />}
@@ -92,8 +92,9 @@ export function SolicitacoesCompra() {
       {!isLoading && solicitacoes?.length === 0 && (
         <Card>
           <CardContent className="py-8 text-center text-sm text-muted-foreground">
-            Nenhuma solicitação ainda. Elas nascem em <strong>Estoque → Explosão de kit</strong>,
-            no botão “Gerar solicitação de compra”.
+            Nenhuma solicitação ainda. Elas nascem em{' '}
+            <strong>Estoque → Necessidade de materiais</strong>, no botão “Gerar solicitação de
+            compra”.
           </CardContent>
         </Card>
       )}

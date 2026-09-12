@@ -7,7 +7,7 @@
 -- A recursão fica num jsonb local: a primeira versão usava tabela temporária e
 -- a limpava com `delete from` sem WHERE, que o guard de DELETE sem cláusula
 -- recusa para o papel `authenticated` ("DELETE requires a WHERE clause").
-create or replace function public.explodir_kit(
+create or replace function public.necessidade_de_materiais(
   p_produto_id uuid,
   p_quantidade numeric default 1
 ) returns jsonb language plpgsql security definer set search_path to 'public' as $function$
@@ -121,5 +121,8 @@ begin
 end;
 $function$;
 
-revoke execute on function public.explodir_kit(uuid, numeric) from anon, public;
-grant execute on function public.explodir_kit(uuid, numeric) to authenticated;
+revoke execute on function public.necessidade_de_materiais(uuid, numeric) from anon, public;
+grant execute on function public.necessidade_de_materiais(uuid, numeric) to authenticated;
+
+comment on function public.necessidade_de_materiais(uuid, numeric) is
+  'Necessidade de materiais para produzir N de um kit: desce pela ficha em vigor (multinível, com perda) e devolve necessário, saldo, reservado, disponível e faltante por componente real.';

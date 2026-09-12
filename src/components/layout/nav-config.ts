@@ -8,6 +8,7 @@ import {
   Contact,
   FileClock,
   FileInput,
+  Factory,
   FileStack,
   Gauge,
   Layers,
@@ -62,6 +63,18 @@ export const navGroups: NavGroup[] = [
         url: '/estoque/entradas',
         icon: FileInput,
         permissao: 'estoque.entradas.processar',
+      },
+    ],
+  },
+  {
+    title: 'Produção',
+    icon: Factory,
+    items: [
+      {
+        title: 'Ordens de produção',
+        url: '/producao/ordens',
+        icon: Factory,
+        permissao: 'producao.gerenciar',
       },
     ],
   },

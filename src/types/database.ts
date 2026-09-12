@@ -717,6 +717,7 @@ export type Database = {
           fornecedor_id: string | null
           id: string
           observacao: string | null
+          ordem_producao_id: string | null
           origem_id: string | null
           origem_tipo: string | null
           produto_id: string
@@ -730,6 +731,7 @@ export type Database = {
           fornecedor_id?: string | null
           id?: string
           observacao?: string | null
+          ordem_producao_id?: string | null
           origem_id?: string | null
           origem_tipo?: string | null
           produto_id: string
@@ -743,6 +745,7 @@ export type Database = {
           fornecedor_id?: string | null
           id?: string
           observacao?: string | null
+          ordem_producao_id?: string | null
           origem_id?: string | null
           origem_tipo?: string | null
           produto_id?: string
@@ -761,6 +764,13 @@ export type Database = {
             columns: ["fornecedor_id"]
             isOneToOne: false
             referencedRelation: "fornecedores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lotes_ordem_producao_id_fkey"
+            columns: ["ordem_producao_id"]
+            isOneToOne: false
+            referencedRelation: "ordens_producao"
             referencedColumns: ["id"]
           },
           {
@@ -1074,6 +1084,7 @@ export type Database = {
           movimentacao_entrada_id: string | null
           movimentacao_saida_id: string | null
           observacao: string | null
+          ordem_producao_id: string | null
           origem_id: string | null
           origem_tipo: string | null
           os_id: string | null
@@ -1095,6 +1106,7 @@ export type Database = {
           movimentacao_entrada_id?: string | null
           movimentacao_saida_id?: string | null
           observacao?: string | null
+          ordem_producao_id?: string | null
           origem_id?: string | null
           origem_tipo?: string | null
           os_id?: string | null
@@ -1116,6 +1128,7 @@ export type Database = {
           movimentacao_entrada_id?: string | null
           movimentacao_saida_id?: string | null
           observacao?: string | null
+          ordem_producao_id?: string | null
           origem_id?: string | null
           origem_tipo?: string | null
           os_id?: string | null
@@ -1182,6 +1195,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "numeros_serie_ordem_producao_id_fkey"
+            columns: ["ordem_producao_id"]
+            isOneToOne: false
+            referencedRelation: "ordens_producao"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "numeros_serie_os_id_fkey"
             columns: ["os_id"]
             isOneToOne: false
@@ -1197,6 +1217,171 @@ export type Database = {
           },
           {
             foreignKeyName: "numeros_serie_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_produtos_estoque"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ordens_producao: {
+        Row: {
+          concluida_em: string | null
+          created_at: string
+          created_by: string | null
+          custo_total: number
+          data_prevista: string | null
+          ficha_id: string
+          id: string
+          iniciada_em: string | null
+          lote_id: string | null
+          numero: number
+          observacao: string | null
+          produto_id: string
+          quantidade_perdida: number
+          quantidade_planejada: number
+          quantidade_produzida: number
+          responsavel_id: string | null
+          status: Database["public"]["Enums"]["ordem_producao_status"]
+          updated_at: string
+        }
+        Insert: {
+          concluida_em?: string | null
+          created_at?: string
+          created_by?: string | null
+          custo_total?: number
+          data_prevista?: string | null
+          ficha_id: string
+          id?: string
+          iniciada_em?: string | null
+          lote_id?: string | null
+          numero?: never
+          observacao?: string | null
+          produto_id: string
+          quantidade_perdida?: number
+          quantidade_planejada: number
+          quantidade_produzida?: number
+          responsavel_id?: string | null
+          status?: Database["public"]["Enums"]["ordem_producao_status"]
+          updated_at?: string
+        }
+        Update: {
+          concluida_em?: string | null
+          created_at?: string
+          created_by?: string | null
+          custo_total?: number
+          data_prevista?: string | null
+          ficha_id?: string
+          id?: string
+          iniciada_em?: string | null
+          lote_id?: string | null
+          numero?: never
+          observacao?: string | null
+          produto_id?: string
+          quantidade_perdida?: number
+          quantidade_planejada?: number
+          quantidade_produzida?: number
+          responsavel_id?: string | null
+          status?: Database["public"]["Enums"]["ordem_producao_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ordens_producao_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ordens_producao_ficha_id_fkey"
+            columns: ["ficha_id"]
+            isOneToOne: false
+            referencedRelation: "fichas_tecnicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ordens_producao_lote_id_fkey"
+            columns: ["lote_id"]
+            isOneToOne: false
+            referencedRelation: "lotes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ordens_producao_lote_id_fkey"
+            columns: ["lote_id"]
+            isOneToOne: false
+            referencedRelation: "vw_saldo_lotes"
+            referencedColumns: ["lote_id"]
+          },
+          {
+            foreignKeyName: "ordens_producao_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ordens_producao_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_produtos_estoque"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ordens_producao_responsavel_id_fkey"
+            columns: ["responsavel_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ordens_producao_itens: {
+        Row: {
+          id: string
+          observacao: string | null
+          ordem_id: string
+          produto_id: string
+          quantidade_consumida: number
+          quantidade_perdida: number
+          quantidade_prevista: number
+        }
+        Insert: {
+          id?: string
+          observacao?: string | null
+          ordem_id: string
+          produto_id: string
+          quantidade_consumida?: number
+          quantidade_perdida?: number
+          quantidade_prevista: number
+        }
+        Update: {
+          id?: string
+          observacao?: string | null
+          ordem_id?: string
+          produto_id?: string
+          quantidade_consumida?: number
+          quantidade_perdida?: number
+          quantidade_prevista?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ordens_producao_itens_ordem_id_fkey"
+            columns: ["ordem_id"]
+            isOneToOne: false
+            referencedRelation: "ordens_producao"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ordens_producao_itens_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ordens_producao_itens_produto_id_fkey"
             columns: ["produto_id"]
             isOneToOne: false
             referencedRelation: "vw_produtos_estoque"
@@ -1545,6 +1730,7 @@ export type Database = {
           estoque_maximo: number | null
           estoque_minimo: number
           id: string
+          kit_modo: Database["public"]["Enums"]["kit_modo"]
           ncm: string | null
           nome: string
           origem_mercadoria: number
@@ -1569,6 +1755,7 @@ export type Database = {
           estoque_maximo?: number | null
           estoque_minimo?: number
           id?: string
+          kit_modo?: Database["public"]["Enums"]["kit_modo"]
           ncm?: string | null
           nome: string
           origem_mercadoria?: number
@@ -1593,6 +1780,7 @@ export type Database = {
           estoque_maximo?: number | null
           estoque_minimo?: number
           id?: string
+          kit_modo?: Database["public"]["Enums"]["kit_modo"]
           ncm?: string | null
           nome?: string
           origem_mercadoria?: number
@@ -1951,6 +2139,16 @@ export type Database = {
       }
     }
     Functions: {
+      abrir_ordem_producao: {
+        Args: {
+          p_data_prevista?: string
+          p_observacao?: string
+          p_produto_id: string
+          p_quantidade: number
+          p_responsavel_id?: string
+        }
+        Returns: Json
+      }
       abrir_sub_os_garantia: {
         Args: { p_os_id: string; p_problema: string }
         Returns: string
@@ -1980,9 +2178,25 @@ export type Database = {
         }
         Returns: Json
       }
+      cancelar_ordem_producao: {
+        Args: { p_motivo?: string; p_ordem_id: string }
+        Returns: undefined
+      }
       cancelar_solicitacao_compra: {
         Args: { p_motivo?: string; p_solicitacao_id: string }
         Returns: undefined
+      }
+      concluir_ordem_producao: {
+        Args: {
+          p_consumos?: Json
+          p_lote_codigo?: string
+          p_observacao?: string
+          p_ordem_id: string
+          p_quantidade_perdida?: number
+          p_quantidade_produzida?: number
+          p_series?: Json
+        }
+        Returns: Json
       }
       concluir_os: {
         Args: {
@@ -2013,6 +2227,10 @@ export type Database = {
           p_quantidade: number
         }
         Returns: Json
+      }
+      iniciar_ordem_producao: {
+        Args: { p_ordem_id: string }
+        Returns: undefined
       }
       marcar_titulos_atrasados: { Args: never; Returns: Json }
       necessidade_de_materiais: {
@@ -2063,6 +2281,7 @@ export type Database = {
       controle_rastreio: "nenhum" | "lote" | "serie"
       ficha_status: "rascunho" | "ativa" | "encerrada"
       financeiro_categoria_tipo: "receita" | "despesa"
+      kit_modo: "fantasma" | "producao"
       movimento_estoque_tipo: "entrada" | "saida" | "ajuste" | "transferencia"
       nfce_status:
         | "pendente"
@@ -2071,6 +2290,11 @@ export type Database = {
         | "erro"
         | "rejeitada"
       nota_fiscal_entrada_status: "pendente" | "processada" | "erro"
+      ordem_producao_status:
+        | "planejada"
+        | "em_producao"
+        | "concluida"
+        | "cancelada"
       os_anexo_tipo: "foto_conclusao" | "assinatura_cliente" | "outro"
       os_item_tipo: "peca" | "servico"
       os_prioridade: "baixa" | "normal" | "alta" | "urgente"
@@ -2229,9 +2453,16 @@ export const Constants = {
       controle_rastreio: ["nenhum", "lote", "serie"],
       ficha_status: ["rascunho", "ativa", "encerrada"],
       financeiro_categoria_tipo: ["receita", "despesa"],
+      kit_modo: ["fantasma", "producao"],
       movimento_estoque_tipo: ["entrada", "saida", "ajuste", "transferencia"],
       nfce_status: ["pendente", "autorizada", "cancelada", "erro", "rejeitada"],
       nota_fiscal_entrada_status: ["pendente", "processada", "erro"],
+      ordem_producao_status: [
+        "planejada",
+        "em_producao",
+        "concluida",
+        "cancelada",
+      ],
       os_anexo_tipo: ["foto_conclusao", "assinatura_cliente", "outro"],
       os_item_tipo: ["peca", "servico"],
       os_prioridade: ["baixa", "normal", "alta", "urgente"],

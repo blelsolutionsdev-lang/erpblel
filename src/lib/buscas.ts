@@ -56,7 +56,26 @@ export async function carregarProduto(id: string): Promise<OpcaoCombobox | null>
   return data ? { value: data.id, label: data.tipo === 'kit' ? `${data.nome} (kit)` : data.nome } : null
 }
 
-/** Só kits, para a explosão de ficha técnica. */
+/** Kits montados por ordem de produção — os únicos que abrem OP. */
+export async function buscarKitsDeProducao(termo: string): Promise<OpcaoCombobox[]> {
+  let query = supabase
+    .from('produtos')
+    .select('id, nome, sku, estoque_atual')
+    .eq('ativo', true)
+    .eq('tipo', 'kit')
+    .eq('kit_modo', 'producao')
+    .order('nome')
+    .limit(LIMITE)
+  if (termo) query = query.or(`nome.ilike.%${termo}%,sku.ilike.%${termo}%`)
+  const { data } = await query
+  return (data ?? []).map((p) => ({
+    value: p.id,
+    label: p.nome,
+    descricao: `saldo ${p.estoque_atual}${p.sku ? ` · ${p.sku}` : ''}`,
+  }))
+}
+
+/** Só kits, para a necessidade de materiais. */
 export async function buscarKits(termo: string): Promise<OpcaoCombobox[]> {
   let query = supabase
     .from('produtos')

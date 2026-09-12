@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/tabs'
 import { useBuscaUrl, useFiltrosUrl } from '@/hooks/use-filtros-url'
 import { formatDate, formatDateTime } from '@/lib/format'
+import { rotuloOrigem } from '@/lib/estoque'
 import { situacaoValidade } from '@/lib/rastreio'
 import { supabase } from '@/lib/supabase'
 import type { Enums } from '@/types/database'
@@ -79,16 +80,6 @@ const rotuloStatusSerie: Record<Enums<'serie_status'>, string> = {
   vendido: 'vendido',
   em_assistencia: 'em assistência',
   baixado: 'baixado',
-}
-
-const rotuloOrigem: Record<string, string> = {
-  compra_xml: 'Entrada de NF-e',
-  compra_pdf: 'Entrada de NF-e',
-  compra_chave: 'Entrada de NF-e',
-  os_baixa: 'Baixa de OS',
-  os_estorno: 'Estorno de OS',
-  kit_baixa: 'Cascata de kit',
-  ajuste_manual: 'Ajuste manual',
 }
 
 function numero(v: number) {
@@ -343,7 +334,7 @@ export function Rastreio() {
                           {numero(Math.abs(m.quantidade))}
                         </span>
                         <span className="min-w-32 flex-1">
-                          {rotuloOrigem[m.origem_tipo ?? ''] ?? m.origem_tipo ?? '—'}
+                          {rotuloOrigem(m.origem_tipo)}
                           {m.os_numero && ` · OS #${m.os_numero}`}
                           {m.nota && ` · NF-e ${m.nota}`}
                           {m.cliente && ` · ${m.cliente}`}
@@ -399,7 +390,7 @@ export function Rastreio() {
                       <dt className="text-muted-foreground">Entrou em</dt>
                       <dd>
                         {formatDateTime(rastro.serie.entrada.quando)} ·{' '}
-                        {rotuloOrigem[rastro.serie.entrada.origem_tipo ?? ''] ?? '—'}
+                        {rotuloOrigem(rastro.serie.entrada.origem_tipo)}
                       </dd>
                     </div>
                   )}
@@ -408,7 +399,7 @@ export function Rastreio() {
                       <dt className="text-muted-foreground">Saiu em</dt>
                       <dd>
                         {formatDateTime(rastro.serie.saida.quando)} ·{' '}
-                        {rotuloOrigem[rastro.serie.saida.origem_tipo ?? ''] ?? '—'}
+                        {rotuloOrigem(rastro.serie.saida.origem_tipo)}
                       </dd>
                     </div>
                   )}

@@ -14,6 +14,7 @@ import { PageHeader } from '@/components/PageHeader'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
+import { rotuloOrigem } from '@/lib/estoque'
 import { supabase } from '@/lib/supabase'
 import { formatCurrency, formatDateTime } from '@/lib/format'
 
@@ -48,16 +49,6 @@ type Resumo = {
   total_pagar: number | null
   reposicao: ItemReposicao[]
   ultimas_movimentacoes: Movimentacao[]
-}
-
-const origemLabel: Record<string, string> = {
-  compra_xml: 'NF-e',
-  compra_pdf: 'NF-e',
-  compra_chave: 'NF-e',
-  os_baixa: 'OS',
-  os_estorno: 'Estorno de OS',
-  kit_baixa: 'Kit',
-  ajuste_manual: 'Ajuste',
 }
 
 function Metrica({
@@ -255,7 +246,7 @@ export function Dashboard() {
                           {Math.abs(mov.quantidade)}
                         </span>
                         <span className="shrink-0 text-xs text-muted-foreground">
-                          {origemLabel[mov.origem] ?? mov.origem}
+                          {rotuloOrigem(mov.origem)}
                         </span>
                       </li>
                     )

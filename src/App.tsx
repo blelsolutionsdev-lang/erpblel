@@ -35,6 +35,9 @@ const Rastreio = lazy(() => import('@/pages/estoque/Rastreio').then((m) => ({ de
 const NecessidadeMateriais = lazy(() =>
   import('@/pages/estoque/NecessidadeMateriais').then((m) => ({ default: m.NecessidadeMateriais })),
 )
+const OrdensProducao = lazy(() =>
+  import('@/pages/producao/OrdensProducao').then((m) => ({ default: m.OrdensProducao })),
+)
 const SolicitacoesCompra = lazy(() =>
   import('@/pages/compras/SolicitacoesCompra').then((m) => ({ default: m.SolicitacoesCompra })),
 )
@@ -111,6 +114,15 @@ export default function App() {
                       element={
                         <ProtectedRoute permissao="compras.solicitar">
                           <SolicitacoesCompra />
+                        </ProtectedRoute>
+                      }
+                    />
+
+                    <Route
+                      path="/producao/ordens"
+                      element={
+                        <ProtectedRoute permissao="producao.gerenciar">
+                          <OrdensProducao />
                         </ProtectedRoute>
                       }
                     />

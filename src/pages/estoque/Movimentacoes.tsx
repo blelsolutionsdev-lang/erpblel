@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/select'
 import { useBuscaUrl, useFiltrosUrl } from '@/hooks/use-filtros-url'
 import { formatCurrency, formatDateTime } from '@/lib/format'
+import { rotuloOrigem } from '@/lib/estoque'
 import { supabase } from '@/lib/supabase'
 import type { Enums, Tables } from '@/types/database'
 
@@ -29,15 +30,6 @@ const tipoLabel: Record<TipoMov, string> = {
   saida: 'Saída',
   ajuste: 'Ajuste',
   transferencia: 'Transferência',
-}
-
-const origemLabel: Record<string, string> = {
-  compra_xml: 'NF-e (XML)',
-  compra_pdf: 'NF-e (PDF)',
-  compra_chave: 'NF-e (chave)',
-  os_baixa: 'Baixa de OS',
-  kit_baixa: 'Componente de kit',
-  ajuste_manual: 'Ajuste manual',
 }
 
 export function Movimentacoes() {
@@ -167,7 +159,7 @@ export function Movimentacoes() {
           },
           {
             titulo: 'Origem',
-            celula: (mov) => (mov.origem_tipo ? (origemLabel[mov.origem_tipo] ?? mov.origem_tipo) : '—'),
+            celula: (mov) => rotuloOrigem(mov.origem_tipo),
           },
           { titulo: 'Responsável', celula: (mov) => mov.autor?.nome ?? '—' },
         ]}

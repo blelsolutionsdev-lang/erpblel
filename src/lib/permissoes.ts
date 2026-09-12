@@ -12,6 +12,7 @@ export const PERMISSOES = [
   'financeiro.gerenciar',
   'fiscal.gerenciar',
   'os.criar',
+  'producao.gerenciar',
   'os.editar',
   'os.excluir',
   'os.servicos.gerenciar',

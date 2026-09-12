@@ -51,6 +51,7 @@ const formSchema = z.object({
   unidade_id: z.string().optional(),
   tipo: z.enum(['simples', 'kit']),
   controle: z.enum(['nenhum', 'lote', 'serie']),
+  kit_modo: z.enum(['fantasma', 'producao']),
   ncm: z.string().optional(),
   cest: z.string().optional(),
   preco_custo: z.coerce.number().min(0),
@@ -70,6 +71,7 @@ const emptyValues: FormValues = {
   unidade_id: '',
   tipo: 'simples',
   controle: 'nenhum',
+  kit_modo: 'fantasma',
   ncm: '',
   cest: '',
   preco_custo: 0,
@@ -178,6 +180,7 @@ export function Produtos() {
         unidade_id: editing.unidade_id ?? '',
         tipo: editing.tipo,
         controle: editing.controle,
+        kit_modo: editing.kit_modo,
         ncm: editing.ncm ?? '',
         cest: editing.cest ?? '',
         preco_custo: editing.preco_custo,
@@ -208,13 +211,17 @@ export function Produtos() {
         unidade_id: values.unidade_id || null,
         tipo: values.tipo,
         // Kit não movimenta saldo próprio: quem carrega lote/série é o componente.
-        controle: values.tipo === 'kit' ? 'nenhum' : values.controle,
+        controle: values.tipo === 'kit' && values.kit_modo === 'fantasma' ? 'nenhum' : values.controle,
+        kit_modo: values.tipo === 'kit' ? values.kit_modo : 'fantasma',
         ncm: values.ncm || null,
         cest: values.cest || null,
         preco_custo: values.preco_custo,
         preco_venda: values.preco_venda,
         // Kits não têm estoque próprio: o saldo vem sempre dos componentes.
-        estoque_minimo: values.tipo === 'kit' ? 0 : values.estoque_minimo,
+        // Kit fantasma não tem saldo, então mínimo não faz sentido; kit de
+        // produção estoca e entra no alerta de reposição como qualquer produto.
+        estoque_minimo:
+          values.tipo === 'kit' && values.kit_modo === 'fantasma' ? 0 : values.estoque_minimo,
       }
 
       if (editing) {
@@ -303,6 +310,7 @@ export function Produtos() {
 
   const tipo = watch('tipo')
   const controle = watch('controle')
+  const kitModo = watch('kit_modo')
   const categoriaId = watch('categoria_id')
   const unidadeId = watch('unidade_id')
 
@@ -534,7 +542,39 @@ export function Produtos() {
                 </Select>
               </div>
 
-              {tipo === 'simples' && (
+              {tipo === 'kit' && (
+                <div className="space-y-2">
+                  <Label>Como este kit vira estoque</Label>
+                  <Select
+                    items={{
+                      fantasma: 'Explode no consumo (não estoca)',
+                      producao: 'Montado por ordem de produção (estoca)',
+                    }}
+                    value={kitModo}
+                    onValueChange={(v) =>
+                      setValue('kit_modo', (v ?? 'fantasma') as 'fantasma' | 'producao')
+                    }
+                    disabled={!podeGerenciar || (!!editing && editing.estoque_atual > 0)}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="fantasma">Explode no consumo (não estoca)</SelectItem>
+                      <SelectItem value="producao">
+                        Montado por ordem de produção (estoca)
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    {kitModo === 'fantasma'
+                      ? 'Ao sair, baixa direto os componentes. Serve para o kit que é só uma lista de peças.'
+                      : 'Tem saldo próprio e só entra por ordem de produção concluída. Serve para o que você monta antes e guarda na prateleira.'}
+                  </p>
+                </div>
+              )}
+
+              {(tipo === 'simples' || kitModo === 'producao') && (
                 <div className="space-y-2">
                   <Label>Rastreio</Label>
                   <Select
@@ -596,7 +636,7 @@ export function Produtos() {
                 </div>
               </div>
 
-              {tipo === 'simples' && (
+              {(tipo === 'simples' || kitModo === 'producao') && (
                 <div className="grid gap-4 sm:grid-cols-2">
                   {/* Estoque inicial vira um ajuste, e ajuste sem lote/série é
                       recusado pelo banco em produto rastreado — a entrada tem
@@ -641,9 +681,9 @@ export function Produtos() {
                   )}
                 </div>
               )}
-              {tipo === 'kit' && (
+              {tipo === 'kit' && kitModo === 'fantasma' && (
                 <p className="text-xs text-muted-foreground">
-                  Kit não tem estoque próprio — o saldo disponível vem dos componentes.
+                  Kit fantasma não tem estoque próprio — o saldo disponível vem dos componentes.
                 </p>
               )}
 

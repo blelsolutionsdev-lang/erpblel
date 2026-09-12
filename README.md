@@ -83,6 +83,12 @@ Schema versionado em `supabase/migrations/`:
 | `20260912200100_saldo_por_lote_e_alocacao_fefo.sql` | `vw_saldo_lotes` e a alocação FEFO na saída |
 | `20260912200200_nfe_cria_lote_e_serie.sql` | a entrada de NF-e abre o lote da nota e grava as séries |
 | `20260912200300_rpcs_rastreio.sql` | `rastrear_lote` e `rastrear_serie` |
+| `20260912200400_views_security_invoker.sql` | rede de segurança do `security_invoker` das views |
+| `20260912210000_kit_modo_fantasma_ou_producao.sql` | **kit que estoca**: `produtos.kit_modo` |
+| `20260912210100_ordens_producao.sql` | `ordens_producao` e a permissão `producao.gerenciar` |
+| `20260912210200_reserva_inclui_ordens_producao.sql` | OP aberta reserva os componentes |
+| `20260912210300_rpcs_ordem_producao_ciclo.sql` | abrir, iniciar e cancelar ordem |
+| `20260912210400_rpc_concluir_ordem_producao.sql` | conclusão transacional com consumo real e perda |
 
 Para aplicar num projeto novo: `supabase db push`. No projeto que já estava no
 ar, essas versões foram registradas como aplicadas no histórico do Supabase, e
@@ -104,6 +110,7 @@ nas Edge Functions e no front (`useAuth().hasPermission`). Usuário com
 Chaves: `administrativo.clientes.gerenciar`,
 `administrativo.fornecedores.gerenciar`, `administrativo.usuarios.gerenciar`,
 `compras.solicitar`, `estoque.entradas.processar`, `estoque.produtos.gerenciar`,
+`producao.gerenciar`,
 `financeiro.gerenciar`, `fiscal.gerenciar`, `os.criar`, `os.editar`,
 `os.excluir`, `os.servicos.gerenciar`, `relatorios.ver`.
 
@@ -143,6 +150,24 @@ Chaves: `administrativo.clientes.gerenciar`,
   travam as duas versões juntas.
 - `produto_kit_itens` está **obsoleta** — mantida só como registro do que havia
   antes de existir versionamento.
+
+#### Ordem de produção
+
+- `produtos.kit_modo` decide o que o kit é: `fantasma` (sem saldo próprio,
+  explode nos componentes ao ser movimentado — o padrão, e o comportamento de
+  sempre) ou `producao` (tem saldo próprio e **só entra por ordem concluída**).
+- A ordem **congela a versão da ficha na abertura**: a ficha pode ganhar versão
+  nova no meio da produção e a ordem continua contando o que foi planejado.
+- Enquanto a ordem está aberta, os componentes ficam **reservados** — entram no
+  `estoque_comprometido` junto com as peças de OS aberta.
+- Concluir é uma transação só: baixa o consumo real, registra a perda, calcula o
+  custo e dá entrada no acabado, com lote (`OP <numero>`) ou séries se ele for
+  rastreado. A perda de componente é absorvida pelas unidades boas, como manda o
+  custo de produção.
+- O consumo real vem preenchido com o previsto: obrigar a redigitar tudo só para
+  dizer "saiu como planejado" seria um convite a não usar a ordem.
+- Ordem concluída **não se cancela**: o consumo já está no razão, que é
+  append-only. Correção se faz com novo lançamento.
 
 #### Rastreio (lote e série)
 
@@ -192,6 +217,7 @@ Chaves: `administrativo.clientes.gerenciar`,
 | Função | O que faz | Exige |
 | --- | --- | --- |
 | `admin-users` | criar/resetar senha/excluir usuário no Auth | `compras.solicitar` | abrir e cancelar solicitações de compra (admin, gerente, estoque) |
+| `producao.gerenciar` | abrir, iniciar, concluir e cancelar ordens de produção (admin, gerente, estoque) |
 | `administrativo.usuarios.gerenciar` |
 | `parse-danfe` | lê um PDF de DANFE com a API da Anthropic | `estoque.entradas.processar` |
 | `focus-nfe-consulta` | consulta NF-e recebida na Focus NFE | `estoque.entradas.processar` |

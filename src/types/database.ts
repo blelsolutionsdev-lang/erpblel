@@ -1,5 +1,3 @@
-// Gerado a partir do schema do Supabase (projeto erpblel).
-// Para regenerar: supabase gen types typescript --project-id uwqsrjpekwaeobdlmsuv
 export type Json =
   | string
   | number
@@ -9,6 +7,8 @@ export type Json =
   | Json[]
 
 export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
@@ -48,48 +48,6 @@ export type Database = {
             columns: ["alterado_por"]
             isOneToOne: false
             referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      fornecedor_produto_codigos: {
-        Row: {
-          codigo: string
-          created_at: string
-          descricao_fornecedor: string | null
-          fornecedor_id: string
-          id: string
-          produto_id: string
-        }
-        Insert: {
-          codigo: string
-          created_at?: string
-          descricao_fornecedor?: string | null
-          fornecedor_id: string
-          id?: string
-          produto_id: string
-        }
-        Update: {
-          codigo?: string
-          created_at?: string
-          descricao_fornecedor?: string | null
-          fornecedor_id?: string
-          id?: string
-          produto_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "fornecedor_produto_codigos_fornecedor_id_fkey"
-            columns: ["fornecedor_id"]
-            isOneToOne: false
-            referencedRelation: "fornecedores"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "fornecedor_produto_codigos_produto_id_fkey"
-            columns: ["produto_id"]
-            isOneToOne: false
-            referencedRelation: "produtos"
             referencedColumns: ["id"]
           },
         ]
@@ -255,142 +213,142 @@ export type Database = {
       }
       configuracoes_fiscais: {
         Row: {
-          cnpj: string | null
-          razao_social: string | null
-          nome_fantasia: string | null
-          inscricao_estadual: string | null
-          regime_tributario: number
-          cfop_padrao: string
-          csosn_padrao: string
-          logradouro: string | null
-          numero: string | null
-          bairro: string | null
-          municipio: string | null
-          codigo_municipio: string | null
-          uf: string | null
-          cep: string | null
-          telefone: string | null
           ambiente: Database["public"]["Enums"]["ambiente_fiscal"]
           ativo: boolean
+          bairro: string | null
+          cep: string | null
+          cfop_padrao: string
+          cnpj: string | null
+          codigo_municipio: string | null
           created_at: string
+          csosn_padrao: string
           focus_nfe_token: string | null
           id: string
+          inscricao_estadual: string | null
+          logradouro: string | null
+          municipio: string | null
+          nome_fantasia: string | null
+          numero: string | null
           proximo_numero: number
+          razao_social: string | null
+          regime_tributario: number
           serie: string
+          telefone: string | null
+          uf: string | null
           updated_at: string
         }
         Insert: {
-          cnpj?: string | null
-          razao_social?: string | null
-          nome_fantasia?: string | null
-          inscricao_estadual?: string | null
-          regime_tributario?: number
-          cfop_padrao?: string
-          csosn_padrao?: string
-          logradouro?: string | null
-          numero?: string | null
-          bairro?: string | null
-          municipio?: string | null
-          codigo_municipio?: string | null
-          uf?: string | null
-          cep?: string | null
-          telefone?: string | null
           ambiente?: Database["public"]["Enums"]["ambiente_fiscal"]
           ativo?: boolean
+          bairro?: string | null
+          cep?: string | null
+          cfop_padrao?: string
+          cnpj?: string | null
+          codigo_municipio?: string | null
           created_at?: string
+          csosn_padrao?: string
           focus_nfe_token?: string | null
           id?: string
+          inscricao_estadual?: string | null
+          logradouro?: string | null
+          municipio?: string | null
+          nome_fantasia?: string | null
+          numero?: string | null
           proximo_numero?: number
+          razao_social?: string | null
+          regime_tributario?: number
           serie?: string
+          telefone?: string | null
+          uf?: string | null
           updated_at?: string
         }
         Update: {
-          cnpj?: string | null
-          razao_social?: string | null
-          nome_fantasia?: string | null
-          inscricao_estadual?: string | null
-          regime_tributario?: number
-          cfop_padrao?: string
-          csosn_padrao?: string
-          logradouro?: string | null
-          numero?: string | null
-          bairro?: string | null
-          municipio?: string | null
-          codigo_municipio?: string | null
-          uf?: string | null
-          cep?: string | null
-          telefone?: string | null
           ambiente?: Database["public"]["Enums"]["ambiente_fiscal"]
           ativo?: boolean
+          bairro?: string | null
+          cep?: string | null
+          cfop_padrao?: string
+          cnpj?: string | null
+          codigo_municipio?: string | null
           created_at?: string
+          csosn_padrao?: string
           focus_nfe_token?: string | null
           id?: string
+          inscricao_estadual?: string | null
+          logradouro?: string | null
+          municipio?: string | null
+          nome_fantasia?: string | null
+          numero?: string | null
           proximo_numero?: number
+          razao_social?: string | null
+          regime_tributario?: number
           serie?: string
+          telefone?: string | null
+          uf?: string | null
           updated_at?: string
         }
         Relationships: []
       }
       contas_pagar: {
         Row: {
-          valor_pago: number
-          juros: number
-          desconto: number
           categoria_id: string | null
           created_at: string
           data_emissao: string
           data_pagamento: string | null
           data_vencimento: string
+          desconto: number
           descricao: string
           forma_pagamento: string | null
           fornecedor_id: string | null
           id: string
+          juros: number
           observacoes: string | null
           origem_id: string | null
           origem_tipo: string | null
           status: Database["public"]["Enums"]["titulo_status"]
           updated_at: string
           valor: number
+          valor_pago: number
         }
         Insert: {
-          valor_pago?: number
-          juros?: number
-          desconto?: number
           categoria_id?: string | null
           created_at?: string
           data_emissao?: string
           data_pagamento?: string | null
           data_vencimento: string
+          desconto?: number
           descricao: string
           forma_pagamento?: string | null
           fornecedor_id?: string | null
           id?: string
+          juros?: number
           observacoes?: string | null
           origem_id?: string | null
           origem_tipo?: string | null
           status?: Database["public"]["Enums"]["titulo_status"]
           updated_at?: string
           valor: number
+          valor_pago?: number
         }
         Update: {
-          valor_pago?: number
-          juros?: number
-          desconto?: number
           categoria_id?: string | null
           created_at?: string
           data_emissao?: string
           data_pagamento?: string | null
           data_vencimento?: string
+          desconto?: number
           descricao?: string
           forma_pagamento?: string | null
           fornecedor_id?: string | null
           id?: string
+          juros?: number
           observacoes?: string | null
           origem_id?: string | null
           origem_tipo?: string | null
           status?: Database["public"]["Enums"]["titulo_status"]
           updated_at?: string
           valor?: number
+          valor_pago?: number
         }
         Relationships: [
           {
@@ -411,64 +369,64 @@ export type Database = {
       }
       contas_receber: {
         Row: {
-          valor_pago: number
-          juros: number
-          desconto: number
           categoria_id: string | null
           cliente_id: string | null
           created_at: string
           data_emissao: string
           data_recebimento: string | null
           data_vencimento: string
+          desconto: number
           descricao: string
           forma_pagamento: string | null
           id: string
+          juros: number
           observacoes: string | null
           origem_id: string | null
           origem_tipo: string | null
           status: Database["public"]["Enums"]["titulo_status"]
           updated_at: string
           valor: number
+          valor_pago: number
         }
         Insert: {
-          valor_pago?: number
-          juros?: number
-          desconto?: number
           categoria_id?: string | null
           cliente_id?: string | null
           created_at?: string
           data_emissao?: string
           data_recebimento?: string | null
           data_vencimento: string
+          desconto?: number
           descricao: string
           forma_pagamento?: string | null
           id?: string
+          juros?: number
           observacoes?: string | null
           origem_id?: string | null
           origem_tipo?: string | null
           status?: Database["public"]["Enums"]["titulo_status"]
           updated_at?: string
           valor: number
+          valor_pago?: number
         }
         Update: {
-          valor_pago?: number
-          juros?: number
-          desconto?: number
           categoria_id?: string | null
           cliente_id?: string | null
           created_at?: string
           data_emissao?: string
           data_recebimento?: string | null
           data_vencimento?: string
+          desconto?: number
           descricao?: string
           forma_pagamento?: string | null
           id?: string
+          juros?: number
           observacoes?: string | null
           origem_id?: string | null
           origem_tipo?: string | null
           status?: Database["public"]["Enums"]["titulo_status"]
           updated_at?: string
           valor?: number
+          valor_pago?: number
         }
         Relationships: [
           {
@@ -490,7 +448,6 @@ export type Database = {
       equipamentos: {
         Row: {
           ativo: boolean
-          updated_at: string
           cliente_id: string
           created_at: string
           id: string
@@ -499,10 +456,10 @@ export type Database = {
           numero_serie: string | null
           observacoes: string | null
           tipo: string | null
+          updated_at: string
         }
         Insert: {
           ativo?: boolean
-          updated_at?: string
           cliente_id: string
           created_at?: string
           id?: string
@@ -511,10 +468,10 @@ export type Database = {
           numero_serie?: string | null
           observacoes?: string | null
           tipo?: string | null
+          updated_at?: string
         }
         Update: {
           ativo?: boolean
-          updated_at?: string
           cliente_id?: string
           created_at?: string
           id?: string
@@ -523,6 +480,7 @@ export type Database = {
           numero_serie?: string | null
           observacoes?: string | null
           tipo?: string | null
+          updated_at?: string
         }
         Relationships: [
           {
@@ -530,6 +488,171 @@ export type Database = {
             columns: ["cliente_id"]
             isOneToOne: false
             referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fichas_tecnicas: {
+        Row: {
+          created_at: string
+          criada_por: string | null
+          custo_calculado: number
+          custo_calculado_em: string | null
+          id: string
+          observacao: string | null
+          produto_id: string
+          status: Database["public"]["Enums"]["ficha_status"]
+          updated_at: string
+          versao: number
+          vigencia_fim: string | null
+          vigencia_inicio: string
+        }
+        Insert: {
+          created_at?: string
+          criada_por?: string | null
+          custo_calculado?: number
+          custo_calculado_em?: string | null
+          id?: string
+          observacao?: string | null
+          produto_id: string
+          status?: Database["public"]["Enums"]["ficha_status"]
+          updated_at?: string
+          versao: number
+          vigencia_fim?: string | null
+          vigencia_inicio?: string
+        }
+        Update: {
+          created_at?: string
+          criada_por?: string | null
+          custo_calculado?: number
+          custo_calculado_em?: string | null
+          id?: string
+          observacao?: string | null
+          produto_id?: string
+          status?: Database["public"]["Enums"]["ficha_status"]
+          updated_at?: string
+          versao?: number
+          vigencia_fim?: string | null
+          vigencia_inicio?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fichas_tecnicas_criada_por_fkey"
+            columns: ["criada_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fichas_tecnicas_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fichas_tecnicas_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_produtos_estoque"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fichas_tecnicas_itens: {
+        Row: {
+          componente_produto_id: string
+          ficha_id: string
+          id: string
+          observacao: string | null
+          perda_percentual: number
+          quantidade: number
+        }
+        Insert: {
+          componente_produto_id: string
+          ficha_id: string
+          id?: string
+          observacao?: string | null
+          perda_percentual?: number
+          quantidade: number
+        }
+        Update: {
+          componente_produto_id?: string
+          ficha_id?: string
+          id?: string
+          observacao?: string | null
+          perda_percentual?: number
+          quantidade?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fichas_tecnicas_itens_componente_produto_id_fkey"
+            columns: ["componente_produto_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fichas_tecnicas_itens_componente_produto_id_fkey"
+            columns: ["componente_produto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_produtos_estoque"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fichas_tecnicas_itens_ficha_id_fkey"
+            columns: ["ficha_id"]
+            isOneToOne: false
+            referencedRelation: "fichas_tecnicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fornecedor_produto_codigos: {
+        Row: {
+          codigo: string
+          created_at: string
+          descricao_fornecedor: string | null
+          fornecedor_id: string
+          id: string
+          produto_id: string
+        }
+        Insert: {
+          codigo: string
+          created_at?: string
+          descricao_fornecedor?: string | null
+          fornecedor_id: string
+          id?: string
+          produto_id: string
+        }
+        Update: {
+          codigo?: string
+          created_at?: string
+          descricao_fornecedor?: string | null
+          fornecedor_id?: string
+          id?: string
+          produto_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fornecedor_produto_codigos_fornecedor_id_fkey"
+            columns: ["fornecedor_id"]
+            isOneToOne: false
+            referencedRelation: "fornecedores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fornecedor_produto_codigos_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fornecedor_produto_codigos_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_produtos_estoque"
             referencedColumns: ["id"]
           },
         ]
@@ -589,6 +712,7 @@ export type Database = {
         Row: {
           created_at: string
           created_by: string | null
+          ficha_tecnica_id: string | null
           id: string
           observacao: string | null
           origem_id: string | null
@@ -601,6 +725,7 @@ export type Database = {
         Insert: {
           created_at?: string
           created_by?: string | null
+          ficha_tecnica_id?: string | null
           id?: string
           observacao?: string | null
           origem_id?: string | null
@@ -613,6 +738,7 @@ export type Database = {
         Update: {
           created_at?: string
           created_by?: string | null
+          ficha_tecnica_id?: string | null
           id?: string
           observacao?: string | null
           origem_id?: string | null
@@ -631,10 +757,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "movimentacoes_estoque_ficha_tecnica_id_fkey"
+            columns: ["ficha_tecnica_id"]
+            isOneToOne: false
+            referencedRelation: "fichas_tecnicas"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "movimentacoes_estoque_produto_id_fkey"
             columns: ["produto_id"]
             isOneToOne: false
             referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "movimentacoes_estoque_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_produtos_estoque"
             referencedColumns: ["id"]
           },
         ]
@@ -744,17 +884,24 @@ export type Database = {
             referencedRelation: "produtos"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "notas_fiscais_entrada_itens_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_produtos_estoque"
+            referencedColumns: ["id"]
+          },
         ]
       }
       notas_fiscais_saida: {
         Row: {
           ambiente: Database["public"]["Enums"]["ambiente_fiscal"]
-          emitida_por: string | null
           autorizada_at: string | null
           chave_acesso: string | null
           cliente_id: string | null
           created_at: string
           danfe_url: string | null
+          emitida_por: string | null
           erro_mensagem: string | null
           focus_nfe_ref: string | null
           id: string
@@ -767,12 +914,12 @@ export type Database = {
         }
         Insert: {
           ambiente?: Database["public"]["Enums"]["ambiente_fiscal"]
-          emitida_por?: string | null
           autorizada_at?: string | null
           chave_acesso?: string | null
           cliente_id?: string | null
           created_at?: string
           danfe_url?: string | null
+          emitida_por?: string | null
           erro_mensagem?: string | null
           focus_nfe_ref?: string | null
           id?: string
@@ -785,12 +932,12 @@ export type Database = {
         }
         Update: {
           ambiente?: Database["public"]["Enums"]["ambiente_fiscal"]
-          emitida_por?: string | null
           autorizada_at?: string | null
           chave_acesso?: string | null
           cliente_id?: string | null
           created_at?: string
           danfe_url?: string | null
+          emitida_por?: string | null
           erro_mensagem?: string | null
           focus_nfe_ref?: string | null
           id?: string
@@ -810,6 +957,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "notas_fiscais_saida_emitida_por_fkey"
+            columns: ["emitida_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "notas_fiscais_saida_os_id_fkey"
             columns: ["os_id"]
             isOneToOne: false
@@ -820,15 +974,8 @@ export type Database = {
       }
       ordens_servico: {
         Row: {
-          prioridade: Database["public"]["Enums"]["os_prioridade"]
-          data_prevista: string | null
-          orcamento_enviado_em: string | null
           aprovado_em: string | null
           aprovado_por: string | null
-          reprovado_em: string | null
-          motivo_reprovacao: string | null
-          garantia_dias: number
-          garantia_ate: string | null
           assinatura_cliente_nome: string | null
           assinatura_cliente_url: string | null
           assinatura_em: string | null
@@ -837,13 +984,20 @@ export type Database = {
           created_at: string
           data_abertura: string
           data_conclusao: string | null
+          data_prevista: string | null
           eh_garantia: boolean
           equipamento_id: string | null
+          garantia_ate: string | null
+          garantia_dias: number
           id: string
           laudo_tecnico: string | null
+          motivo_reprovacao: string | null
           numero: number
+          orcamento_enviado_em: string | null
           os_origem_id: string | null
+          prioridade: Database["public"]["Enums"]["os_prioridade"]
           problema_relatado: string | null
+          reprovado_em: string | null
           status: Database["public"]["Enums"]["os_status"]
           tecnico_id: string | null
           updated_at: string
@@ -854,15 +1008,8 @@ export type Database = {
           valor_total: number | null
         }
         Insert: {
-          prioridade?: Database["public"]["Enums"]["os_prioridade"]
-          data_prevista?: string | null
-          orcamento_enviado_em?: string | null
           aprovado_em?: string | null
           aprovado_por?: string | null
-          reprovado_em?: string | null
-          motivo_reprovacao?: string | null
-          garantia_dias?: number
-          garantia_ate?: string | null
           assinatura_cliente_nome?: string | null
           assinatura_cliente_url?: string | null
           assinatura_em?: string | null
@@ -871,13 +1018,20 @@ export type Database = {
           created_at?: string
           data_abertura?: string
           data_conclusao?: string | null
+          data_prevista?: string | null
           eh_garantia?: boolean
           equipamento_id?: string | null
+          garantia_ate?: string | null
+          garantia_dias?: number
           id?: string
           laudo_tecnico?: string | null
+          motivo_reprovacao?: string | null
           numero?: never
+          orcamento_enviado_em?: string | null
           os_origem_id?: string | null
+          prioridade?: Database["public"]["Enums"]["os_prioridade"]
           problema_relatado?: string | null
+          reprovado_em?: string | null
           status?: Database["public"]["Enums"]["os_status"]
           tecnico_id?: string | null
           updated_at?: string
@@ -888,15 +1042,8 @@ export type Database = {
           valor_total?: number | null
         }
         Update: {
-          prioridade?: Database["public"]["Enums"]["os_prioridade"]
-          data_prevista?: string | null
-          orcamento_enviado_em?: string | null
           aprovado_em?: string | null
           aprovado_por?: string | null
-          reprovado_em?: string | null
-          motivo_reprovacao?: string | null
-          garantia_dias?: number
-          garantia_ate?: string | null
           assinatura_cliente_nome?: string | null
           assinatura_cliente_url?: string | null
           assinatura_em?: string | null
@@ -905,13 +1052,20 @@ export type Database = {
           created_at?: string
           data_abertura?: string
           data_conclusao?: string | null
+          data_prevista?: string | null
           eh_garantia?: boolean
           equipamento_id?: string | null
+          garantia_ate?: string | null
+          garantia_dias?: number
           id?: string
           laudo_tecnico?: string | null
+          motivo_reprovacao?: string | null
           numero?: never
+          orcamento_enviado_em?: string | null
           os_origem_id?: string | null
+          prioridade?: Database["public"]["Enums"]["os_prioridade"]
           problema_relatado?: string | null
+          reprovado_em?: string | null
           status?: Database["public"]["Enums"]["os_status"]
           tecnico_id?: string | null
           updated_at?: string
@@ -1009,6 +1163,13 @@ export type Database = {
             columns: ["produto_id"]
             isOneToOne: false
             referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ordens_servico_itens_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_produtos_estoque"
             referencedColumns: ["id"]
           },
           {
@@ -1117,10 +1278,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "produto_kit_itens_componente_produto_id_fkey"
+            columns: ["componente_produto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_produtos_estoque"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "produto_kit_itens_kit_produto_id_fkey"
             columns: ["kit_produto_id"]
             isOneToOne: false
             referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "produto_kit_itens_kit_produto_id_fkey"
+            columns: ["kit_produto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_produtos_estoque"
             referencedColumns: ["id"]
           },
         ]
@@ -1411,11 +1586,23 @@ export type Database = {
       }
     }
     Functions: {
-      abrir_sub_os_garantia: { Args: { p_os_id: string; p_problema: string }; Returns: string }
+      abrir_sub_os_garantia: {
+        Args: { p_os_id: string; p_problema: string }
+        Returns: string
+      }
+      ajustar_estoque: {
+        Args: {
+          p_novo_saldo: number
+          p_observacao?: string
+          p_produto_id: string
+        }
+        Returns: number
+      }
       aprovar_orcamento_os: {
         Args: { p_aprovado_por: string; p_os_id: string }
         Returns: undefined
       }
+      ativar_ficha_tecnica: { Args: { p_ficha_id: string }; Returns: Json }
       baixar_titulo: {
         Args: {
           p_data?: string
@@ -1428,9 +1615,31 @@ export type Database = {
         }
         Returns: Json
       }
+      concluir_os: {
+        Args: {
+          p_assinatura_nome: string
+          p_assinatura_path: string
+          p_fotos: Json
+          p_laudo: string
+          p_os_id: string
+        }
+        Returns: undefined
+      }
+      consumo_produtos: { Args: { p_dias?: number }; Returns: Json }
+      contagem_produtos_por_categoria: { Args: never; Returns: Json }
+      criar_versao_ficha: {
+        Args: {
+          p_copiar_da_ativa?: boolean
+          p_observacao?: string
+          p_produto_id: string
+        }
+        Returns: string
+      }
+      definir_estoque_minimo: { Args: { p_itens: Json }; Returns: number }
       enviar_orcamento_os: { Args: { p_os_id: string }; Returns: undefined }
       marcar_titulos_atrasados: { Args: never; Returns: Json }
       preparar_nfce_os: { Args: { p_os_id: string }; Returns: Json }
+      registrar_entrada_nfe: { Args: { p_payload: Json }; Returns: Json }
       registrar_retorno_nfce: {
         Args: {
           p_chave?: string
@@ -1442,42 +1651,33 @@ export type Database = {
         }
         Returns: undefined
       }
-      relatorio_abc_pecas: { Args: { p_ate: string; p_de: string }; Returns: Json }
-      relatorio_contas_aging: { Args: never; Returns: Json }
-      relatorio_faturamento: { Args: { p_ate: string; p_de: string }; Returns: Json }
-      relatorio_tecnicos: { Args: { p_ate: string; p_de: string }; Returns: Json }
-      reprovar_orcamento_os: { Args: { p_motivo: string; p_os_id: string }; Returns: undefined }
-      sugerir_produtos_nfe: { Args: { p_payload: Json }; Returns: Json }
-      ajustar_estoque: {
-        Args: {
-          p_novo_saldo: number
-          p_observacao?: string
-          p_produto_id: string
-        }
-        Returns: number
+      relatorio_abc_pecas: {
+        Args: { p_ate: string; p_de: string }
+        Returns: Json
       }
-      consumo_produtos: { Args: { p_dias?: number }; Returns: Json }
-      contagem_produtos_por_categoria: { Args: never; Returns: Json }
-      definir_estoque_minimo: { Args: { p_itens: Json }; Returns: number }
-      totais_caixa: { Args: { p_ate: string; p_de: string }; Returns: Json }
-      concluir_os: {
-        Args: {
-          p_assinatura_nome: string
-          p_assinatura_path: string
-          p_fotos: Json
-          p_laudo: string
-          p_os_id: string
-        }
+      relatorio_contas_aging: { Args: never; Returns: Json }
+      relatorio_faturamento: {
+        Args: { p_ate: string; p_de: string }
+        Returns: Json
+      }
+      relatorio_tecnicos: {
+        Args: { p_ate: string; p_de: string }
+        Returns: Json
+      }
+      reprovar_orcamento_os: {
+        Args: { p_motivo: string; p_os_id: string }
         Returns: undefined
       }
-      registrar_entrada_nfe: { Args: { p_payload: Json }; Returns: Json }
       resumo_dashboard: { Args: never; Returns: Json }
+      sugerir_produtos_nfe: { Args: { p_payload: Json }; Returns: Json }
+      totais_caixa: { Args: { p_ate: string; p_de: string }; Returns: Json }
       user_has_permission: { Args: { p_chave: string }; Returns: boolean }
       usuario_ativo: { Args: never; Returns: boolean }
     }
     Enums: {
       ambiente_fiscal: "homologacao" | "producao"
       caixa_movimento_tipo: "entrada" | "saida"
+      ficha_status: "rascunho" | "ativa" | "encerrada"
       financeiro_categoria_tipo: "receita" | "despesa"
       movimento_estoque_tipo: "entrada" | "saida" | "ajuste" | "transferencia"
       nfce_status:
@@ -1630,6 +1830,7 @@ export const Constants = {
     Enums: {
       ambiente_fiscal: ["homologacao", "producao"],
       caixa_movimento_tipo: ["entrada", "saida"],
+      ficha_status: ["rascunho", "ativa", "encerrada"],
       financeiro_categoria_tipo: ["receita", "despesa"],
       movimento_estoque_tipo: ["entrada", "saida", "ajuste", "transferencia"],
       nfce_status: ["pendente", "autorizada", "cancelada", "erro", "rejeitada"],

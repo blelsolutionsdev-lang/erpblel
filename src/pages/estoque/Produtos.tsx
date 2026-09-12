@@ -9,7 +9,7 @@ import { PageHeader } from '@/components/PageHeader'
 import { Paginacao } from '@/components/Paginacao'
 import { DataTable } from '@/components/DataTable'
 import { CampoMoeda } from '@/components/campos/CampoMoeda'
-import { KitComposicao } from '@/components/estoque/KitComposicao'
+import { FichaTecnica } from '@/components/estoque/FichaTecnica'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -608,7 +608,7 @@ export function Produtos() {
             </fieldset>
           </form>
 
-          {tipo === 'kit' && editing && <KitComposicao kitId={editing.id} editavel={podeGerenciar} />}
+          {tipo === 'kit' && editing && <FichaTecnica produtoId={editing.id} editavel={podeGerenciar} />}
           {tipo === 'kit' && !editing && (
             <p className="text-xs text-muted-foreground">
               Salve o produto primeiro para adicionar os componentes do kit.

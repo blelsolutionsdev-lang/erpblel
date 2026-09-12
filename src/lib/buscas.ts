@@ -56,6 +56,34 @@ export async function carregarProduto(id: string): Promise<OpcaoCombobox | null>
   return data ? { value: data.id, label: data.tipo === 'kit' ? `${data.nome} (kit)` : data.nome } : null
 }
 
+/**
+ * Componentes elegíveis para a ficha técnica de um produto.
+ *
+ * Exclui o próprio produto no servidor; o resto dos ciclos (A contém B que
+ * contém A) é barrado pelo gatilho `impedir_ciclo_ficha` no banco.
+ */
+export function buscarComponentes(produtoId: string) {
+  return async (termo: string): Promise<OpcaoCombobox[]> => {
+    let query = supabase
+      .from('produtos')
+      .select('id, nome, sku, tipo, estoque_atual, preco_custo')
+      .eq('ativo', true)
+      .neq('id', produtoId)
+      .order('nome')
+      .limit(LIMITE)
+    if (termo) query = query.or(`nome.ilike.%${termo}%,sku.ilike.%${termo}%`)
+    const { data } = await query
+    return (data ?? []).map((p) => ({
+      value: p.id,
+      label: p.tipo === 'kit' ? `${p.nome} (submontado)` : p.nome,
+      descricao:
+        p.tipo === 'kit'
+          ? (p.sku ?? undefined)
+          : `saldo ${p.estoque_atual}${p.sku ? ` · ${p.sku}` : ''}`,
+    }))
+  }
+}
+
 export async function buscarServicos(termo: string): Promise<OpcaoCombobox[]> {
   let query = supabase.from('servicos').select('id, nome, preco').eq('ativo', true).order('nome').limit(LIMITE)
   if (termo) query = query.ilike('nome', `%${termo}%`)

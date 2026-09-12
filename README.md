@@ -66,6 +66,14 @@ Schema versionado em `supabase/migrations/`:
 | `20260912005000_relatorios_e_estoque_disponivel.sql` | relatórios gerenciais e saldo disponível |
 | `20260912006000_fiscal_nfce.sql` | dados do emitente e emissão de NFC-e |
 | `20260912007000_rpcs_agregacoes_front.sql` | agregações que estavam sendo feitas no navegador |
+| `20260912100000_triggers_permitem_manutencao_admin.sql` | manutenção administrativa não esbarra nos gatilhos de proteção da OS |
+| `20260912110000_dashboard_com_estoque.sql` | panorama de estoque e reposição no `resumo_dashboard` |
+| `20260912120000_estoque_minimo_em_lote.sql` | `definir_estoque_minimo` e `consumo_produtos` |
+| `20260912181946_ficha_tecnica_versionada_schema.sql` | **BOM versionada**: `fichas_tecnicas` e `fichas_tecnicas_itens` |
+| `20260912182002_ficha_tecnica_ciclo_auditoria_rastro.sql` | detecção de ciclo, auditoria da ficha e `movimentacoes_estoque.ficha_tecnica_id` |
+| `20260912182013_ficha_tecnica_migrar_produto_kit_itens.sql` | migra a composição antiga para a versão 1 (nada é apagado) |
+| `20260912182038_ficha_tecnica_rpcs_versao_e_ativacao.sql` | `criar_versao_ficha` e `ativar_ficha_tecnica` |
+| `20260912182050_cascata_estoque_usa_ficha_vigente.sql` | a baixa em cascata passa a ler a ficha em vigor |
 
 Para aplicar num projeto novo: `supabase db push`. No projeto que já estava no
 ar, essas versões foram registradas como aplicadas no histórico do Supabase, e
@@ -106,7 +114,26 @@ Chaves: `administrativo.clientes.gerenciar`,
   aprovou e quando.
 - Baixa de título aceita valor parcial, juros e desconto, e lança no caixa.
 - Ninguém altera o próprio papel nem o próprio status de ativo.
-- Toda alteração de tabela sensível vai para `auditoria`.
+- Toda alteração de tabela sensível vai para `auditoria` — inclusive a ficha
+  técnica, que antes era a única operação crítica sem rastro.
+
+#### Ficha técnica (BOM)
+
+- A composição de um kit vive em `fichas_tecnicas` + `fichas_tecnicas_itens`, e
+  **só uma versão fica em vigor por produto** (índice único parcial).
+- A versão em vigor é imutável pela tela: alterar exige abrir um rascunho
+  (`criar_versao_ficha`, que nasce como cópia) e ativá-lo (`ativar_ficha_tecnica`,
+  que encerra a anterior e congela o custo do dia).
+- Cada baixa em cascata grava em `movimentacoes_estoque.ficha_tecnica_id` de qual
+  **versão** ela saiu — é isso que mantém o histórico reconstruível depois que a
+  ficha muda.
+- A ficha aceita submontados (kit dentro de kit): a cascata recursa sozinha e
+  `impedir_ciclo_ficha` recusa ciclos até 20 níveis.
+- `perda_percentual` é refugo previsto: 3 m com 5% consomem 3,15 m. A mesma conta
+  está em `src/lib/ficha.ts` para o custo estimado do rascunho, com testes que
+  travam as duas versões juntas.
+- `produto_kit_itens` está **obsoleta** — mantida só como registro do que havia
+  antes de existir versionamento.
 
 ### Rotinas agendadas (pg_cron)
 

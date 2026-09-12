@@ -12,6 +12,7 @@ import {
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -76,15 +77,19 @@ export function MenuUsuario() {
           <span className="hidden max-w-32 truncate sm:inline">{profile?.nome ?? '...'}</span>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="min-w-56">
-          <DropdownMenuLabel className="font-normal">
-            <div className="flex flex-col gap-0.5">
-              <span className="font-medium">{profile?.nome ?? '—'}</span>
-              <span className="text-xs text-muted-foreground">{user?.email}</span>
-              <span className="text-xs text-muted-foreground capitalize">
-                {profile?.role?.nome ?? 'sem papel'}
-              </span>
-            </div>
-          </DropdownMenuLabel>
+          {/* O GroupLabel do base-ui exige um Group em volta — solto ele lançava
+              "MenuGroupContext is missing" e o menu da conta caía no ErrorBoundary. */}
+          <DropdownMenuGroup>
+            <DropdownMenuLabel className="font-normal">
+              <div className="flex flex-col gap-0.5">
+                <span className="font-medium">{profile?.nome ?? '—'}</span>
+                <span className="text-xs text-muted-foreground">{user?.email}</span>
+                <span className="text-xs text-muted-foreground capitalize">
+                  {profile?.role?.nome ?? 'sem papel'}
+                </span>
+              </div>
+            </DropdownMenuLabel>
+          </DropdownMenuGroup>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={() => setTrocandoSenha(true)}>
             <KeyRound className="size-4" />

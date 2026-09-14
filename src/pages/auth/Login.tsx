@@ -1,11 +1,14 @@
 import { Factory } from 'lucide-react'
 import { type FormEvent, useState } from 'react'
 import { Navigate } from 'react-router-dom'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useAuth } from '@/lib/auth'
+import { mensagemErro } from '@/lib/erros'
+import { supabase } from '@/lib/supabase'
 
 export function Login() {
   const { user, loading, signIn } = useAuth()
@@ -13,6 +16,7 @@ export function Login() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [recuperando, setRecuperando] = useState(false)
 
   if (!loading && user) {
     return <Navigate to="/" replace />
@@ -25,6 +29,27 @@ export function Login() {
     const { error } = await signIn(email, password)
     setSubmitting(false)
     if (error) setError(error)
+  }
+
+  // Antes, esquecer a senha significava pedir para um admin resetar.
+  async function handleRecuperar() {
+    if (!email.trim()) {
+      setError('Informe seu e-mail para receber o link de redefinição.')
+      return
+    }
+    setError(null)
+    setRecuperando(true)
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: `${window.location.origin}/redefinir-senha`,
+      })
+      if (error) throw error
+      toast.success('Se esse e-mail estiver cadastrado, o link de redefinição chega em instantes.')
+    } catch (err) {
+      setError(mensagemErro(err))
+    } finally {
+      setRecuperando(false)
+    }
   }
 
   return (
@@ -65,6 +90,15 @@ export function Login() {
             {error && <p className="text-sm text-destructive">{error}</p>}
             <Button type="submit" className="w-full" disabled={submitting}>
               {submitting ? 'Entrando...' : 'Entrar'}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              className="w-full"
+              onClick={handleRecuperar}
+              disabled={recuperando}
+            >
+              {recuperando ? 'Enviando...' : 'Esqueci minha senha'}
             </Button>
           </form>
         </CardContent>

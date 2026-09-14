@@ -1,11 +1,15 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Plus } from 'lucide-react'
+import { Plus, Search } from 'lucide-react'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 import { z } from 'zod'
 import { PageHeader } from '@/components/PageHeader'
+import { Paginacao } from '@/components/Paginacao'
+import { DataTable } from '@/components/DataTable'
+import { CampoMoeda } from '@/components/campos/CampoMoeda'
+import { BaixarTituloDialog, type TituloParaBaixa } from '@/components/financeiro/BaixarTituloDialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -25,9 +29,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Skeleton } from '@/components/ui/skeleton'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { formatCurrency, formatDate } from '@/lib/format'
+import { useBuscaUrl, useFiltrosUrl } from '@/hooks/use-filtros-url'
+import { mensagemErro } from '@/lib/erros'
 import { supabase } from '@/lib/supabase'
 import type { Tables, TablesInsert } from '@/types/database'
 
@@ -56,18 +60,36 @@ const statusLabel: Record<Tables<'contas_receber'>['status'], string> = {
 export function ContasReceber() {
   const queryClient = useQueryClient()
   const [open, setOpen] = useState(false)
+  const [baixando, setBaixando] = useState<TituloParaBaixa | null>(null)
 
-  const { data: contas, isLoading } = useQuery({
-    queryKey: ['contas_receber'],
+  const { filtros, definir, pagina, setPagina, de, ate } = useFiltrosUrl({ q: '' })
+  const { texto: busca, setTexto: setBusca } = useBuscaUrl(filtros.q, (q) => definir({ q }))
+
+  const {
+    data: resultado,
+    isLoading,
+    isFetching,
+  } = useQuery({
+    queryKey: ['contas_receber', filtros.q, pagina],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('contas_receber')
-        .select('*, cliente:clientes(*), categoria:categorias_financeiras(*)')
+        .select('*, cliente:clientes(*), categoria:categorias_financeiras(*)', { count: 'exact' })
         .order('data_vencimento')
+        .range(de, ate)
+
+      const termo = filtros.q.trim()
+      if (termo) {
+        query = query.ilike('descricao', `%${termo}%`)
+      }
+
+      const { data, error, count } = await query
       if (error) throw error
-      return data as ContaReceber[]
+      return { linhas: data as ContaReceber[], total: count }
     },
   })
+
+  const contas = resultado?.linhas
 
   const { data: clientes } = useQuery({
     queryKey: ['clientes-select'],
@@ -97,6 +119,7 @@ export function ContasReceber() {
     reset,
     setValue,
     watch,
+    control,
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -123,23 +146,7 @@ export function ContasReceber() {
       setOpen(false)
       reset()
     },
-    onError: (error: Error) => toast.error(error.message),
-  })
-
-  const receberMutation = useMutation({
-    mutationFn: async (conta: ContaReceber) => {
-      const { error } = await supabase
-        .from('contas_receber')
-        .update({ status: 'pago', data_recebimento: new Date().toISOString().slice(0, 10) })
-        .eq('id', conta.id)
-      if (error) throw error
-    },
-    onSuccess: () => {
-      toast.success('Recebimento registrado.')
-      queryClient.invalidateQueries({ queryKey: ['contas_receber'] })
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
-    },
-    onError: (error: Error) => toast.error(error.message),
+    onError: (error: unknown) => toast.error(mensagemErro(error)),
   })
 
   const clienteId = watch('cliente_id')
@@ -216,11 +223,10 @@ export function ContasReceber() {
                   )}
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="valor">Valor</Label>
-                    <Input id="valor" type="number" step="0.01" min={0} {...register('valor')} />
-                    {errors.valor && <p className="text-xs text-destructive">{errors.valor.message}</p>}
+                    <CampoMoeda id="valor" control={control} name="valor" />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="data_vencimento">Vencimento</Label>
@@ -241,71 +247,100 @@ export function ContasReceber() {
         }
       />
 
-      <div className="rounded-lg border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Cliente</TableHead>
-              <TableHead>Descrição</TableHead>
-              <TableHead>Vencimento</TableHead>
-              <TableHead>Valor</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="w-40" />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading &&
-              Array.from({ length: 4 }).map((_, i) => (
-                <TableRow key={i}>
-                  <TableCell colSpan={6}>
-                    <Skeleton className="h-6 w-full" />
-                  </TableCell>
-                </TableRow>
-              ))}
-
-            {!isLoading && contas?.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
-                  Nenhuma conta a receber cadastrada ainda.
-                </TableCell>
-              </TableRow>
-            )}
-
-            {contas?.map((conta) => (
-              <TableRow key={conta.id}>
-                <TableCell className="font-medium">{conta.cliente?.nome ?? '—'}</TableCell>
-                <TableCell>
-                  {conta.descricao}
-                  {conta.origem_tipo === 'os' && (
-                    <Badge variant="outline" className="ml-2">
-                      gerada por OS
-                    </Badge>
-                  )}
-                </TableCell>
-                <TableCell>{formatDate(conta.data_vencimento)}</TableCell>
-                <TableCell>{formatCurrency(conta.valor)}</TableCell>
-                <TableCell>
-                  <Badge variant={conta.status === 'pago' ? 'default' : 'secondary'}>
-                    {statusLabel[conta.status]}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  {conta.status !== 'pago' && conta.status !== 'cancelado' && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => receberMutation.mutate(conta)}
-                      disabled={receberMutation.isPending}
-                    >
-                      Marcar como recebido
-                    </Button>
-                  )}
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+      <div className="mb-3 flex items-center gap-2">
+        <div className="relative w-full max-w-sm">
+          <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            placeholder="Buscar pela descrição do título..."
+            className="pl-8"
+          />
+        </div>
       </div>
+
+      <DataTable
+        linhas={contas}
+        carregando={isLoading}
+        chave={(conta) => conta.id}
+        vazio={filtros.q ? 'Nenhum título encontrado para essa busca.' : 'Nenhuma conta a receber cadastrada ainda.'}
+        colunas={[
+          {
+            titulo: 'Descrição',
+            mobile: 'titulo',
+            celula: (conta) => (
+              <div>
+                <div className="font-medium">{conta.descricao}</div>
+                <div className="text-xs text-muted-foreground">
+                  {conta.cliente?.nome ?? '—'}
+                  {conta.origem_tipo === 'os' && ' · gerada por OS'}
+                </div>
+              </div>
+            ),
+          },
+          { titulo: 'Vencimento', celula: (conta) => formatDate(conta.data_vencimento) },
+          { titulo: 'Valor', alinhar: 'direita', celula: (conta) => formatCurrency(conta.valor) },
+          {
+            titulo: 'Em aberto',
+            alinhar: 'direita',
+            celula: (conta) =>
+              conta.status === 'pago' ? (
+                <span className="text-muted-foreground">—</span>
+              ) : (
+                <span className={conta.valor_pago > 0 ? 'text-amber-600' : ''}>
+                  {formatCurrency(conta.valor - conta.valor_pago)}
+                </span>
+              ),
+          },
+          {
+            titulo: 'Status',
+            celula: (conta) => (
+              <Badge
+                variant={
+                  conta.status === 'pago'
+                    ? 'default'
+                    : conta.status === 'atrasado'
+                      ? 'destructive'
+                      : 'secondary'
+                }
+              >
+                {statusLabel[conta.status]}
+              </Badge>
+            ),
+          },
+        ]}
+        acoes={(conta) =>
+          conta.status !== 'pago' && conta.status !== 'cancelado' ? (
+            <Button
+              size="xs"
+              variant="outline"
+              onClick={() =>
+                setBaixando({
+                  id: conta.id,
+                  descricao: conta.descricao,
+                  valor: conta.valor,
+                  valor_pago: conta.valor_pago,
+                })
+              }
+            >
+              Baixar
+            </Button>
+          ) : null
+        }
+      />
+
+      <Paginacao
+        pagina={pagina}
+        setPagina={setPagina}
+        total={resultado?.total}
+        carregando={isFetching}
+      />
+
+      <BaixarTituloDialog
+        tipo="receber"
+        titulo={baixando}
+        onOpenChange={(v) => !v && setBaixando(null)}
+      />
     </div>
   )
 }

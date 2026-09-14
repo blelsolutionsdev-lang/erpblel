@@ -1,0 +1,10 @@
+project_id = "erpblel"
+
+[functions.admin-users]
+verify_jwt = true
+
+[functions.parse-danfe]
+verify_jwt = true
+
+[functions.focus-nfe-consulta]
+verify_jwt = true

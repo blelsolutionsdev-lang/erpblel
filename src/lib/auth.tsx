@@ -2,12 +2,16 @@ import type { Session, User } from '@supabase/supabase-js'
 import {
   createContext,
   type ReactNode,
+  useCallback,
   useContext,
   useEffect,
+  useMemo,
   useState,
 } from 'react'
+import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import type { Tables } from '@/types/database'
+import type { Permissao } from '@/lib/permissoes'
 
 type Profile = Tables<'profiles'> & { role: Tables<'roles'> | null }
 
@@ -15,10 +19,13 @@ type AuthContextValue = {
   user: User | null
   session: Session | null
   profile: Profile | null
+  /** Sessão ainda sendo resolvida (antes de saber se há usuário logado). */
   loading: boolean
+  /** Perfil + permissões já carregados: só depois disso a UI pode decidir o que esconder. */
+  pronto: boolean
   permissoes: Set<string>
   permissoesCarregadas: boolean
-  hasPermission: (chave: string) => boolean
+  hasPermission: (chave: Permissao) => boolean
   signIn: (email: string, password: string) => Promise<{ error: string | null }>
   signOut: () => Promise<void>
   refreshProfile: () => Promise<void>
@@ -33,6 +40,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [permissoes, setPermissoes] = useState<Set<string>>(new Set())
   const [permissoesCarregadas, setPermissoesCarregadas] = useState(false)
 
+  // O objeto `session` é recriado a cada refresh de token (~1h). Depender do id
+  // evita recarregar perfil e permissões (e piscar a UI) a cada renovação.
+  const userId = session?.user?.id ?? null
+
   useEffect(() => {
     let active = true
 
@@ -43,7 +54,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
 
     const { data: subscription } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      if (!active) return
       setSession(newSession)
+      setLoading(false)
     })
 
     return () => {
@@ -52,50 +65,72 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  async function carregarProfile(userId: string) {
+  const carregarProfile = useCallback(async (id: string) => {
     const { data } = await supabase
       .from('profiles')
       .select('*, role:roles(*)')
-      .eq('id', userId)
+      .eq('id', id)
       .maybeSingle()
-    setProfile(data as Profile | null)
-    return data as Profile | null
-  }
+    return (data as Profile | null) ?? null
+  }, [])
 
   useEffect(() => {
-    if (!session?.user) {
+    let active = true
+
+    if (!userId) {
       setProfile(null)
       setPermissoes(new Set())
       setPermissoesCarregadas(false)
       return
     }
 
-    carregarProfile(session.user.id)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session?.user])
-
-  useEffect(() => {
-    let active = true
-
-    if (!session?.user || !profile) {
-      return
-    }
-
     setPermissoesCarregadas(false)
 
-    Promise.all([
-      profile.role_id
-        ? supabase
-            .from('role_permissions')
-            .select('permission:permissions(chave)')
-            .eq('role_id', profile.role_id)
-        : Promise.resolve({ data: [] as { permission: { chave: string } | null }[] }),
-      supabase
-        .from('user_permissions')
-        .select('allow, permission:permissions(chave)')
-        .eq('user_id', session.user.id),
-    ]).then(([papel, overrides]) => {
+    async function carregar(id: string) {
+      try {
+        await carregarPerfilEPermissoes(id)
+      } catch (err) {
+        // Falha de rede ao carregar perfil/permissões não pode deixar o app
+        // preso na tela de "Carregando..." para sempre: libera a renderização
+        // sem permissão nenhuma, e a própria tela mostra o erro.
+        console.error('Falha ao carregar perfil e permissões:', err)
+        if (active) {
+          setPermissoes(new Set())
+          setPermissoesCarregadas(true)
+        }
+      }
+    }
+
+    async function carregarPerfilEPermissoes(id: string) {
+      const perfil = await carregarProfile(id)
       if (!active) return
+
+      setProfile(perfil)
+
+      // Conta desativada no ERP continua com sessão válida no Supabase Auth:
+      // sem este corte, o usuário seguiria "dentro" do sistema (só esbarrando
+      // em erros de RLS). Derruba a sessão e explica o motivo.
+      if (perfil && !perfil.ativo) {
+        toast.error('Seu acesso foi desativado. Procure um administrador.')
+        await supabase.auth.signOut()
+        return
+      }
+
+      const [papel, overrides] = await Promise.all([
+        perfil?.role_id
+          ? supabase
+              .from('role_permissions')
+              .select('permission:permissions(chave)')
+              .eq('role_id', perfil.role_id)
+          : Promise.resolve({ data: [] as { permission: { chave: string } | null }[] }),
+        supabase
+          .from('user_permissions')
+          .select('allow, permission:permissions(chave)')
+          .eq('user_id', id),
+      ])
+
+      if (!active) return
+
       const set = new Set<string>()
       for (const row of papel.data ?? []) {
         if (row.permission?.chave) set.add(row.permission.chave)
@@ -107,50 +142,62 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       setPermissoes(set)
       setPermissoesCarregadas(true)
-    })
+    }
+
+    void carregar(userId)
 
     return () => {
       active = false
     }
-  }, [session?.user, profile])
+  }, [userId, carregarProfile])
 
-  async function signIn(email: string, password: string) {
+  const signIn = useCallback(async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     return { error: error?.message ?? null }
-  }
+  }, [])
 
-  async function signOut() {
+  const signOut = useCallback(async () => {
     await supabase.auth.signOut()
-  }
+  }, [])
 
-  async function refreshProfile() {
-    if (session?.user) await carregarProfile(session.user.id)
-  }
+  const refreshProfile = useCallback(async () => {
+    if (!userId) return
+    setProfile(await carregarProfile(userId))
+  }, [userId, carregarProfile])
 
-  function hasPermission(chave: string) {
-    return permissoes.has(chave)
-  }
+  const hasPermission = useCallback((chave: Permissao) => permissoes.has(chave), [permissoes])
 
-  return (
-    <AuthContext.Provider
-      value={{
-        user: session?.user ?? null,
-        session,
-        profile,
-        loading,
-        permissoes,
-        permissoesCarregadas,
-        hasPermission,
-        signIn,
-        signOut,
-        refreshProfile,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
+  const value = useMemo<AuthContextValue>(
+    () => ({
+      user: session?.user ?? null,
+      session,
+      profile,
+      loading,
+      pronto: !loading && (!session?.user || permissoesCarregadas),
+      permissoes,
+      permissoesCarregadas,
+      hasPermission,
+      signIn,
+      signOut,
+      refreshProfile,
+    }),
+    [
+      session,
+      profile,
+      loading,
+      permissoes,
+      permissoesCarregadas,
+      hasPermission,
+      signIn,
+      signOut,
+      refreshProfile,
+    ],
   )
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
   const ctx = useContext(AuthContext)
   if (!ctx) throw new Error('useAuth deve ser usado dentro de <AuthProvider>')
